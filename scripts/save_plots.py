@@ -1,5 +1,6 @@
 """
 Generate and save all EDA plots from the commodity price dataset.
+Run from project root: .venv/bin/python scripts/save_plots.py
 """
 import pandas as pd
 import numpy as np
@@ -11,10 +12,14 @@ import matplotlib.ticker as mticker
 import seaborn as sns
 from scipy import stats
 import warnings, os
+from pathlib import Path
 
 warnings.filterwarnings('ignore')
 
-PLOT_DIR = 'plots'
+# Resolve project root (one level up from scripts/)
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+DATA_DIR = PROJECT_ROOT / 'data'
+PLOT_DIR = PROJECT_ROOT / 'plots'
 os.makedirs(PLOT_DIR, exist_ok=True)
 
 sns.set_theme(style='whitegrid', palette='husl', font_scale=1.1)
@@ -68,7 +73,7 @@ def load_and_clean(filepath, year):
     return pd.DataFrame(records)
 
 print('Loading data...')
-df = pd.concat([load_and_clean(f'{y}.xlsx', y) for y in [2023, 2024, 2025]], ignore_index=True)
+df = pd.concat([load_and_clean(DATA_DIR / f'{y}.xlsx', y) for y in [2023, 2024, 2025]], ignore_index=True)
 df['date'] = pd.to_datetime(df['date'])
 df['month'] = df['date'].dt.month
 df['category'] = df['commodity'].map(CATEGORY_MAP)

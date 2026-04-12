@@ -5,7 +5,7 @@ Semua 13 plot tersimpan di folder `plots/`. Berikut interpretasi lengkap tiap vi
 ---
 
 ## Plot 1 — Box Plots: Distribusi Harga per Komoditas & Tahun
-![Box Plots](/plots/01_boxplots.png)
+![Box Plots]](../plots/01_boxplots.png)
 
 ### Temuan Utama:
 - **Daging Sapi** adalah komoditas termahal (~Rp 150K–180K), outliernya sangat tinggi dan terpisah jauh dari komoditas lainnya.
@@ -17,7 +17,7 @@ Semua 13 plot tersimpan di folder `plots/`. Berikut interpretasi lengkap tiap vi
 ---
 
 ## Plot 2 — Violin Plots: Distribusi Komoditas Paling Volatil
-![Violin Plots](/plots/02_violin_volatile.png)
+![Violin Plots]](../plots/02_violin_volatile.png)
 
 ### Temuan Utama:
 - **Cabai Merah Keriting 2025**: Distribusi sangat melebar ke atas (sampai >140K), menunjukkan terjadi lonjakan harga yang ekstrem. Bentuk violin *bimodal* — ada dua puncak, satu di ~30K dan satu di ~80K.
@@ -28,7 +28,7 @@ Semua 13 plot tersimpan di folder `plots/`. Berikut interpretasi lengkap tiap vi
 ---
 
 ## Plot 3 — Time Series Semua Komoditas per Kategori
-![Time Series](/plots/03_timeseries_all.png)
+![Time Series]](../plots/03_timeseries_all.png)
 
 ### Temuan Utama:
 - **Bawang Merah**: Pola *cyclical* yang sangat jelas — ada puncak-puncak harga yang berulang setiap ~6 bulan.
@@ -45,7 +45,7 @@ Semua 13 plot tersimpan di folder `plots/`. Berikut interpretasi lengkap tiap vi
 ---
 
 ## Plot 4 — Komoditas Volatil dengan 30-Day Moving Average
-![Volatile MA](/plots/04_volatile_ma30.png)
+![Volatile MA]](../plots/04_volatile_ma30.png)
 
 ### Temuan Utama:
 - **Cabai Merah Keriting**: MA30 menunjukkan 5 siklus harga dalam 3 tahun. Siklus terakhir (Q4 2025) adalah yang paling tinggi (~80K MA, dengan daily peak >140K). Tren baseline naik dari ~40K ke ~60K.
@@ -55,7 +55,7 @@ Semua 13 plot tersimpan di folder `plots/`. Berikut interpretasi lengkap tiap vi
 ---
 
 ## Plot 5 — Total Perubahan Harga 2023→2025
-![Total Change](/plots/05_total_change_bar.png)
+![Total Change]](../plots/05_total_change_bar.png)
 
 ### Temuan Utama:
 - **5 Komoditas naik di atas 20%** (merah, di atas threshold):
@@ -74,7 +74,7 @@ Semua 13 plot tersimpan di folder `plots/`. Berikut interpretasi lengkap tiap vi
 ---
 
 ## Plot 6 — Perbandingan Kenaikan Year-over-Year
-![YoY Comparison](/plots/06_yoy_comparison.png)
+![YoY Comparison]](../plots/06_yoy_comparison.png)
 
 ### Temuan Utama:
 - **Pola umum**: Kenaikan 2023→2024 (biru) umumnya **lebih besar** dari 2024→2025 (merah) untuk mayoritas komoditas. Ini menandakan laju inflasi harga melambat di 2025.
@@ -87,7 +87,7 @@ Semua 13 plot tersimpan di folder `plots/`. Berikut interpretasi lengkap tiap vi
 ---
 
 ## Plot 7 — Heatmap Volatilitas (Coefficient of Variation)
-![CV Heatmap](/plots/07_cv_heatmap.png)
+![CV Heatmap]](../plots/07_cv_heatmap.png)
 
 ### Temuan Utama:
 - **Cabai Merah Keriting** adalah yang PALING volatil — CV naik tiap tahun: 25.9% → 31.6% → **35.5%**. Ini sangat tinggi.
@@ -100,7 +100,7 @@ Semua 13 plot tersimpan di folder `plots/`. Berikut interpretasi lengkap tiap vi
 ---
 
 ## Plot 8 — Matriks Korelasi Harga
-![Correlation Matrix](/plots/08_correlation_matrix.png)
+![Correlation Matrix]](../plots/08_correlation_matrix.png)
 
 ### Temuan Utama:
 - **Cluster yang sangat kuat (r > 0.95)**:
@@ -119,7 +119,7 @@ Semua 13 plot tersimpan di folder `plots/`. Berikut interpretasi lengkap tiap vi
 ---
 
 ## Plot 9 — Pola Seasonalitas Bulanan
-![Seasonality](/plots/09_seasonality.png)
+![Seasonality]](../plots/09_seasonality.png)
 
 ### Temuan Utama:
 - **Cabai Merah Keriting**: Puncak di Feb-Mar dan Aug-Sep. Trough di Sep-Oct (musim panen besar cabai). Tahun 2025 sangat anomali — harga melonjak tajam di Q4.
@@ -132,7 +132,7 @@ Semua 13 plot tersimpan di folder `plots/`. Berikut interpretasi lengkap tiap vi
 ---
 
 ## Plot 10 — Heatmap Seasonalitas Z-Score
-![Z-Score Heatmap](/plots/10_zscore_heatmap.png)
+![Z-Score Heatmap]](../plots/10_zscore_heatmap.png)
 
 ### Temuan Utama:
 - **Pola "mahal di akhir tahun"**: Hampir semua komoditas berwarna merah (Z-score tinggi) di **Oct-Nov-Dec**, terutama:
@@ -152,7 +152,7 @@ Semua 13 plot tersimpan di folder `plots/`. Berikut interpretasi lengkap tiap vi
 ---
 
 ## Plot 11 — Distribusi Return Harian
-![Daily Returns](/plots/11_daily_returns.png)
+![Daily Returns]](../plots/11_daily_returns.png)
 
 ### Temuan Utama:
 - **Cabai Merah Keriting**: σ = 8.06% — standar deviasi return harian tertinggi. Distribusi memiliki **ekor kanan yang sangat panjang** (sampai +100%!), menandakan satu hari bisa naik 2x lipat.
@@ -167,7 +167,7 @@ Semua 13 plot tersimpan di folder `plots/`. Berikut interpretasi lengkap tiap vi
 ---
 
 ## Plot 12 — Harga Rata-rata per Kategori & Tahun
-![Category Prices](/plots/12_category_prices.png)
+![Category Prices]](../plots/12_category_prices.png)
 
 ### Temuan Utama:
 - **Daging Sapi** mendominasi skala harga (~Rp 150K), 3x lipat dari kategori ke-2.
@@ -178,7 +178,7 @@ Semua 13 plot tersimpan di folder `plots/`. Berikut interpretasi lengkap tiap vi
 ---
 
 ## Plot 13 — Stacked Area Chart: Kontribusi Kategori terhadap Total Harga
-![Stacked Area](/plots/13_stacked_area.png)
+![Stacked Area]](../plots/13_stacked_area.png)
 
 ### Temuan Utama:
 - **Total combined price naik ~30%**: dari ~Rp 270K (Jan 2023) ke ~Rp 350K+ (Nov 2025).

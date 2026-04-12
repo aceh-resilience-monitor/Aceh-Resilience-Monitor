@@ -1,11 +1,18 @@
 """
 Prepare dashboard data from Excel commodity price files.
 Outputs dashboard/dashboard_data.json for the ARM web dashboard.
+Run from project root: .venv/bin/python scripts/prepare_dashboard_data.py
 """
 import pandas as pd
 import numpy as np
 import json
 import os
+from pathlib import Path
+
+# Resolve project root (one level up from scripts/)
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+DATA_DIR = PROJECT_ROOT / 'data'
+DASHBOARD_DIR = PROJECT_ROOT / 'dashboard'
 
 # ── Load & Clean (reused from save_plots.py) ──────────────────────
 CATEGORY_MAP = {
@@ -94,7 +101,7 @@ def load_and_clean(filepath, year):
 
 
 print('Loading data...')
-df = pd.concat([load_and_clean(f'{y}.xlsx', y) for y in [2023, 2024, 2025]], ignore_index=True)
+df = pd.concat([load_and_clean(DATA_DIR / f'{y}.xlsx', y) for y in [2023, 2024, 2025]], ignore_index=True)
 df['date'] = pd.to_datetime(df['date'])
 df['month'] = df['date'].dt.month
 df['category'] = df['commodity'].map(CATEGORY_MAP)
@@ -336,8 +343,8 @@ dashboard_data = {
     'categoryIcons': CATEGORY_ICONS,
 }
 
-os.makedirs('dashboard', exist_ok=True)
-output_path = 'dashboard/dashboard_data.json'
+os.makedirs(DASHBOARD_DIR, exist_ok=True)
+output_path = DASHBOARD_DIR / 'dashboard_data.json'
 with open(output_path, 'w', encoding='utf-8') as f:
     json.dump(dashboard_data, f, ensure_ascii=False, indent=None)
 

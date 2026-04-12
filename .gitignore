@@ -13,11 +13,13 @@ env/
 # IDE
 .vscode/
 .idea/
+.gemini/
 
 # Temp files
 *.tmp
 *.log
-data_overview.txt
-stats_overview.txt
-yoy_changes.txt
 ~$*.xlsx
+
+# Generated dashboard data (can be regenerated from scripts)
+dashboard/dashboard_data.json
+dashboard/dashboard_data.js
