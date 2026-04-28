@@ -86,7 +86,7 @@ async function initApp() {
   }
 
   renderKPIs();
-  renderAIInsight();
+  renderEarlyWarning();
   renderCommodityGrid();
   renderPriceTrendChart();
   renderYoYChart();
@@ -156,6 +156,180 @@ function renderKPIs() {
     </div>
   `).join('');
 }
+
+// ── Early Warning System (menggunakan data prediksi Prophet nyata) ───
+function renderEarlyWarning() {
+  const container = document.getElementById('early-warning-grid');
+  if (!container) return;
+
+  // Ambil data PREDIKSI nyata dari alertFeed (severity === 'prediction')
+  // Ini adalah output langsung dari model Meta Prophet yang meramal 90 hari ke depan
+  const predictions = (DATA.alertFeed || [])
+    .filter(a => a.severity === 'prediction')
+    .sort((a, b) => b.spike_pct - a.spike_pct); // Urutkan dari lonjakan terbesar
+
+  if (predictions.length === 0) {
+    container.innerHTML = `<div class="glass-card" style="grid-column: 1 / -1; text-align: center; color: var(--text-muted);"><p>Tidak ada prediksi lonjakan harga saat ini.</p></div>`;
+    return;
+  }
+
+  // Buat lookup icon dari commodityCards
+  const iconMap = {};
+  (DATA.commodityCards || []).forEach(c => {
+    iconMap[c.commodity] = c.icon;
+  });
+
+  // Simpan ke window agar bisa diakses modal
+  window._allPredictions = predictions;
+  window._iconMap = iconMap;
+
+  // Helper: render 1 kartu prediksi
+  function buildCard(p) {
+    const icon = iconMap[p.commodity] || '📦';
+    const spikePct = p.spike_pct.toFixed(1);
+    const currentPrice = formatPrice(p.current_price);
+    const predictedPrice = formatPrice(p.price);
+    const isExtreme = p.spike_pct >= 50;
+    const borderColor = isExtreme ? 'var(--status-critical)' : 'var(--status-warning)';
+    const bgGlow    = isExtreme ? 'rgba(239, 68, 68, 0.12)' : 'rgba(234, 179, 8, 0.08)';
+    const textColor = isExtreme ? 'var(--status-critical)' : 'var(--status-warning)';
+    const badge     = isExtreme ? 'EKSTREM 🔴' : 'WASPADA 🟡';
+    const badgeBg   = isExtreme ? 'rgba(239,68,68,0.2)' : 'rgba(234,179,8,0.2)';
+    const badgeBorder = isExtreme ? 'rgba(239,68,68,0.3)' : 'rgba(234,179,8,0.3)';
+    const rec = p.action || 'Siapkan stok cadangan.';
+    return `
+      <div class="kpi-card" style="border-top: 4px solid ${borderColor}; position: relative; overflow: hidden; background: linear-gradient(145deg, rgba(30, 41, 59, 0.7) 0%, rgba(15, 23, 42, 0.9) 100%);">
+        <div style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(135deg, ${bgGlow} 0%, transparent 100%); pointer-events: none;"></div>
+        <div class="kpi-title" style="display: flex; align-items: center; justify-content: space-between; font-weight: 600;">
+          <span style="font-size: 1.1rem;">${icon} ${p.shortName}</span>
+          <span style="font-size: 0.7rem; padding: 2px 8px; border-radius: 12px; background: ${badgeBg}; color: ${textColor}; font-weight: bold; border: 1px solid ${badgeBorder};">${badge}</span>
+        </div>
+        <div class="kpi-value" style="color: ${textColor}; font-size: 2rem; margin-top: 0.8rem; text-shadow: 0 0 12px ${bgGlow};">
+          +${spikePct}%
+          <span style="font-size: 0.75rem; color: var(--text-muted); font-weight: normal; text-shadow: none; display: block; margin-top: 2px;">Prediksi Lonjakan 90 Hari (Meta Prophet)</span>
+        </div>
+        <div style="margin-top: 0.8rem; display: flex; gap: 8px;">
+          <div style="flex: 1; background: rgba(255,255,255,0.05); border-radius: 8px; padding: 6px 10px;">
+            <div style="font-size: 0.7rem; color: var(--text-muted); margin-bottom: 2px;">Harga Sekarang</div>
+            <div style="font-size: 0.9rem; color: var(--text-main); font-weight: 600;">${currentPrice}</div>
+          </div>
+          <div style="flex: 1; background: rgba(239,68,68,0.08); border-radius: 8px; padding: 6px 10px; border: 1px solid ${badgeBorder};">
+            <div style="font-size: 0.7rem; color: var(--text-muted); margin-bottom: 2px;">Prediksi Harga</div>
+            <div style="font-size: 0.9rem; color: ${textColor}; font-weight: 600;">${predictedPrice}</div>
+          </div>
+        </div>
+        <div style="margin-top: 0.8rem; padding-top: 0.8rem; border-top: 1px solid rgba(255,255,255,0.08); font-size: 0.82rem; color: #94a3b8; display: flex; align-items: flex-start; gap: 6px;">
+          <span style="color: var(--status-warning); flex-shrink: 0;">⚡</span>
+          <span>${rec}</span>
+        </div>
+      </div>
+    `;
+  }
+
+  // Tampilkan Top 3 saja di kartu utama
+  let html = predictions.slice(0, 3).map(buildCard).join('');
+
+  // Jika ada >3 prediksi, tampilkan tombol "Lihat Semua"
+  if (predictions.length > 3) {
+    html += `
+      <div style="grid-column: 1 / -1; display: flex; justify-content: center; margin-top: 0.5rem;">
+        <button onclick="showAllPredictionsModal()"
+          style="display: flex; align-items: center; gap: 8px; padding: 10px 24px;
+                 background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.15);
+                 border-radius: 20px; color: var(--text-main); font-size: 0.88rem;
+                 cursor: pointer; font-family: inherit; transition: background 0.2s;"
+          onmouseover="this.style.background='rgba(255,255,255,0.1)'"
+          onmouseout="this.style.background='rgba(255,255,255,0.05)'">
+          📋 Lihat Semua Prediksi
+          <span style="background: var(--status-warning); color: #000; font-weight: bold;
+                       font-size: 0.75rem; padding: 1px 7px; border-radius: 10px;">${predictions.length}</span>
+        </button>
+      </div>
+    `;
+  }
+
+  container.innerHTML = html;
+}
+
+// ── Modal: Tabel Semua Prediksi Prophet ──────────────────────────
+function showAllPredictionsModal() {
+  const predictions = window._allPredictions || [];
+  const iconMap = window._iconMap || {};
+
+  const rows = predictions.map((p, i) => {
+    const icon = iconMap[p.commodity] || '📦';
+    const isExtreme = p.spike_pct >= 50;
+    const textColor = isExtreme ? '#ef4444' : '#eab308';
+    const badge = isExtreme ? '🔴 EKSTREM' : '🟡 WASPADA';
+    return `
+      <tr style="border-bottom: 1px solid rgba(255,255,255,0.07);"
+          onmouseover="this.style.background='rgba(255,255,255,0.04)'"
+          onmouseout="this.style.background='transparent'">
+        <td style="padding: 10px 12px; color: #94a3b8; font-size: 0.8rem;">${i + 1}</td>
+        <td style="padding: 10px 12px; font-weight: 600;">${icon} ${p.shortName}</td>
+        <td style="padding: 10px 12px; color: ${textColor}; font-weight: 700; font-size: 1.05rem;">+${p.spike_pct.toFixed(1)}%</td>
+        <td style="padding: 10px 12px; color: #cbd5e1;">${formatPrice(p.current_price)}</td>
+        <td style="padding: 10px 12px; color: ${textColor}; font-weight: 600;">${formatPrice(p.price)}</td>
+        <td style="padding: 10px 12px;">
+          <span style="font-size: 0.72rem; padding: 2px 8px; border-radius: 10px;
+                       background: ${isExtreme ? 'rgba(239,68,68,0.2)' : 'rgba(234,179,8,0.2)'};
+                       color: ${textColor}; font-weight: bold;">${badge}</span>
+        </td>
+      </tr>`;
+  }).join('');
+
+  document.body.insertAdjacentHTML('beforeend', `
+    <div id="predictions-modal-overlay"
+         onclick="if(event.target.id==='predictions-modal-overlay') closePredictionsModal()"
+         style="position: fixed; inset: 0; z-index: 9999;
+                background: rgba(0,0,0,0.7); backdrop-filter: blur(6px);
+                display: flex; align-items: center; justify-content: center; padding: 20px;">
+      <div style="background: linear-gradient(145deg, #1e293b, #0f172a);
+                  border: 1px solid rgba(255,255,255,0.12); border-radius: 16px;
+                  width: 100%; max-width: 820px; max-height: 85vh;
+                  display: flex; flex-direction: column; overflow: hidden;
+                  box-shadow: 0 25px 60px rgba(0,0,0,0.5);">
+        <div style="padding: 20px 24px; border-bottom: 1px solid rgba(255,255,255,0.08);
+                    display: flex; align-items: center; justify-content: space-between;">
+          <div>
+            <h3 style="margin: 0; font-size: 1.1rem; color: #f1f5f9;">🚨 Semua Prediksi Lonjakan Harga</h3>
+            <p style="margin: 4px 0 0; font-size: 0.8rem; color: #64748b;">
+              Output Meta Prophet — ${predictions.length} komoditas diprediksi melonjak &gt;15% dalam 90 hari
+            </p>
+          </div>
+          <button onclick="closePredictionsModal()"
+                  style="background: rgba(255,255,255,0.08); border: none; border-radius: 8px;
+                         width: 32px; height: 32px; color: #94a3b8; cursor: pointer; font-size: 1.1rem;">✕</button>
+        </div>
+        <div style="overflow-y: auto; padding: 12px 0;">
+          <table style="width: 100%; border-collapse: collapse; font-size: 0.88rem; color: #e2e8f0;">
+            <thead>
+              <tr style="background: rgba(255,255,255,0.04);">
+                <th style="padding: 10px 12px; text-align: left; color: #64748b; font-weight: 500;">#</th>
+                <th style="padding: 10px 12px; text-align: left; color: #64748b; font-weight: 500;">Komoditas</th>
+                <th style="padding: 10px 12px; text-align: left; color: #64748b; font-weight: 500;">Prediksi Naik</th>
+                <th style="padding: 10px 12px; text-align: left; color: #64748b; font-weight: 500;">Harga Saat Ini</th>
+                <th style="padding: 10px 12px; text-align: left; color: #64748b; font-weight: 500;">Prediksi Harga</th>
+                <th style="padding: 10px 12px; text-align: left; color: #64748b; font-weight: 500;">Status</th>
+              </tr>
+            </thead>
+            <tbody>${rows}</tbody>
+          </table>
+        </div>
+        <div style="padding: 14px 24px; border-top: 1px solid rgba(255,255,255,0.08);
+                    font-size: 0.75rem; color: #475569; text-align: center;">
+          ⚡ Prediksi oleh <strong style="color:#94a3b8;">Meta Prophet</strong> · MAPE rata-rata: <strong style="color:#94a3b8;">7.74%</strong>
+        </div>
+      </div>
+    </div>
+  `);
+}
+
+function closePredictionsModal() {
+  const el = document.getElementById('predictions-modal-overlay');
+  if (el) el.remove();
+}
+
 
 // ── Render Commodity Status Grid ─────────────────────────────────
 function renderCommodityGrid() {
@@ -726,14 +900,23 @@ function renderCategoryAreaChart() {
           },
         },
         tooltip: {
-          mode: 'index',
+          mode: 'nearest',
+          intersect: false,
           backgroundColor: 'rgba(17, 24, 39, 0.95)',
           titleColor: '#f1f5f9',
           bodyColor: '#94a3b8',
           borderColor: 'rgba(255,255,255,0.1)',
           borderWidth: 1,
+          titleFont: { family: 'Inter', size: 12, weight: '600' },
+          bodyFont: { family: 'Inter', size: 11 },
+          padding: 10,
           callbacks: {
-            label: (ctx) => `${ctx.dataset.label}: ${formatPrice(ctx.raw)}`,
+            title: (items) => {
+              if (!items.length) return '';
+              const d = new Date(items[0].parsed.x);
+              return d.toLocaleDateString('id-ID', { month: 'long', year: 'numeric' });
+            },
+            label: (tooltipItem) => ` ${tooltipItem.dataset.label}: ${formatPrice(tooltipItem.raw)}`,
           },
         },
       },
@@ -759,25 +942,7 @@ function renderCategoryAreaChart() {
   });
 }
 
-// ── AI Executive Summary ─────────────────────────────────────────
-function renderAIInsight() {
-  const panel = document.getElementById('ai-insight-text');
-  if (!panel) return;
-  const insight = DATA.aiInsight || 'AI Insight tidak tersedia. Silakan konfigurasi Azure OpenAI API Key.';
-  
-  // Convert newlines to HTML paragraphs for rich display
-  const paragraphs = insight.split('\n\n').filter(p => p.trim());
-  const htmlContent = paragraphs.map(p => `<p style="margin-bottom: 12px">${p}</p>`).join('');
-  
-  // Fade-in reveal effect
-  panel.style.opacity = '0';
-  panel.innerHTML = htmlContent;
-  
-  setTimeout(() => {
-    panel.style.transition = 'opacity 0.8s ease';
-    panel.style.opacity = '1';
-  }, 300);
-}
+
 
 // ── Navigation between tab sections ──────────────────────────────
 function switchSection(sectionId) {

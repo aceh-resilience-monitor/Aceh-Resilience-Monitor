@@ -2,13 +2,13 @@
 
 ![Python](https://img.shields.io/badge/Python-3.9+-3776AB?logo=python&logoColor=white)
 ![Prophet](https://img.shields.io/badge/Meta_Prophet-ML_Forecasting-00D4FF?logo=meta&logoColor=white)
-![Azure OpenAI](https://img.shields.io/badge/Azure_OpenAI-Generative_AI-0078D4?logo=microsoftazure&logoColor=white)
+![Azure Blob Storage](https://img.shields.io/badge/Azure_Blob_Storage-Data_Lake-0078D4?logo=microsoftazure&logoColor=white)
 ![Chart.js](https://img.shields.io/badge/Chart.js-v4-FF6384?logo=chartdotjs&logoColor=white)
 ![Azure Static Web Apps](https://img.shields.io/badge/Azure-Static_Web_Apps-0078D4?logo=microsoftazure&logoColor=white)
 
-> **Platform Intelijen Harga Pangan Berbasis Hybrid AI** — Dari pemantauan reaktif ke prediksi proaktif.
+> **Platform Intelijen Harga Pangan Berbasis AI** — Dari pemantauan reaktif ke prediksi proaktif.
 
-Aceh Resilience Monitor adalah sistem peringatan dini harga bahan pangan strategis di Provinsi Aceh yang memadukan **Machine Learning klasik (Meta Prophet)** dengan **Generative AI (Azure OpenAI)** untuk memberikan wawasan prediktif 90 hari ke depan kepada pengambil kebijakan.
+Aceh Resilience Monitor adalah sistem peringatan dini harga bahan pangan strategis di Provinsi Aceh yang menggunakan **Machine Learning (Meta Prophet)** terintegrasi dengan **🚨 Early Warning System** untuk memberikan wawasan prediktif lonjakan harga 90 hari ke depan kepada pengambil kebijakan.
 
 **Topik:** Ketahanan Pangan & Agrikultur Modern  
 **Kompetisi:** Datathon Dicoding × Microsoft Elevate Training Center 2026
@@ -22,11 +22,9 @@ graph LR
     A[📊 Excel Data<br/>2023-2025] --> B[🐍 Python ETL<br/>Pandas]
     B --> C[📈 Prophet ML<br/>Forecasting 90 Hari]
     B --> D[🔍 Z-Score<br/>Anomaly Detection]
-    C --> E[🤖 Azure OpenAI<br/>Executive Summary]
-    D --> E
     C --> F[📦 dashboard_data.json]
     D --> F
-    E --> F
+    F --> I[☁️ Azure Blob Storage<br/>(Planned Data Lake)]
     F --> G[📱 Chart.js Dashboard<br/>Interactive UI]
     G --> H[☁️ Azure Static Web Apps<br/>Deployment]
 ```
@@ -41,9 +39,9 @@ graph LR
 | 2 | **Statistical Anomaly Detection** | Mendeteksi lonjakan harga abnormal menggunakan Z-Score terhadap Moving Average 30 hari. Mengklasifikasikan sebagai ⚠️ WASPADA atau 🚨 KRITIS. |
 | 3 | **Interactive Dashboard** | Antarmuka visual premium (dark glassmorphism) dengan 8+ komponen interaktif: KPI cards, status grid, price trend, YoY comparison, seasonality heatmap, volatility heatmap, stacked area chart. |
 | 4 | **ML Forecasting 90 Hari** | 18 model Meta Prophet individual (1 per komoditas) memprediksi harga 90 hari ke depan, termasuk batas kepercayaan atas/bawah (*Confidence Interval*). |
-| 5 | **🤖 AI Executive Summary** | Integrasi Azure OpenAI yang merangkum anomali dan prediksi menjadi teks laporan naratif bergaya "Analis Ekonomi" secara otomatis untuk pengambil kebijakan. |
+| 5 | **🚨 Early Warning System (Meta Prophet AI)** | Panel peringatan interaktif yang secara dinamis menyoroti komoditas dengan prediksi lonjakan harga terekstrem (misal: >15%) dalam 90 hari ke depan, lengkap dengan rekomendasi intervensi. |
 | 6 | **Prophet Model Evaluation** | Notebook riset (`evaluate_prophet.ipynb`) dengan backtesting Train/Test Split — metrik MAE, RMSE, dan MAPE untuk ke-18 komoditas. |
-| 7 | **Early Warning System** | Feed peringatan real-time dengan 3 tingkat: Normal → Waspada → Kritis, ditambah alert prediksi 🔮 PREDIKSI dari hasil forecasting. |
+| 7 | **Azure Blob Storage (Planned)** | Persiapan integrasi dengan Azure Blob Storage sebagai data lake untuk menyimpan dan mendistribusikan data dashboard secara cloud-native. |
 
 ---
 
@@ -70,10 +68,10 @@ Metode: **Train/Test Split** — Data Training: Jan 2023 – Sep 2025 | Data Tes
 |---|---|---|
 | Data Processing | Python, Pandas, NumPy | ETL, cleaning, transformasi |
 | Machine Learning | Meta Prophet | Time-series forecasting 90 hari |
-| Generative AI | **Azure OpenAI** (GPT-4o-mini) | Ringkasan eksekutif otomatis |
 | Visualization | Chart.js v4, Vanilla JS | Dashboard interaktif |
 | Styling | Vanilla CSS (Glassmorphism) | UI/UX premium |
 | Hosting | **Azure Static Web Apps** | Deployment cloud |
+| Cloud Storage | **Azure Blob Storage** | Data lake & distribusi data (Direncanakan) |
 | Version Control | Git, GitHub | Kolaborasi tim |
 
 ---
@@ -95,20 +93,12 @@ cd datathon-dicoding
 pip install -r requirements.txt
 ```
 
-### 3. (Opsional) Set Azure OpenAI Environment Variables
-```bash
-export AZURE_OPENAI_ENDPOINT="https://your-resource.openai.azure.com/"
-export AZURE_OPENAI_API_KEY="your-api-key"
-export AZURE_OPENAI_DEPLOYMENT="gpt-4o-mini"
-```
-> Jika tidak di-set, sistem akan menggunakan fallback summary otomatis berbasis data.
-
-### 4. Jalankan Pipeline
+### 3. Jalankan Pipeline
 ```bash
 python scripts/prepare_dashboard_data.py
 ```
 
-### 5. Buka Dashboard
+### 4. Buka Dashboard
 Buka file `dashboard/index.html` di browser, atau akses versi live di Azure Static Web Apps.
 
 ---

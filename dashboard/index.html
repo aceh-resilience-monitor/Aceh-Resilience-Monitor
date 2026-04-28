@@ -49,19 +49,16 @@
       <div id="kpi-grid" class="kpi-grid"></div>
     </section>
 
-    <!-- ── AI Executive Summary Panel ─────────────────────── -->
-    <section id="section-ai-insight">
+    <!-- ── Early Warning System Panel (Meta Prophet) ─────────────────────── -->
+    <section id="section-early-warning" class="mb-4">
       <div class="section-header">
         <div>
-          <h2 class="section-title"><span class="icon">🤖</span> Analisis AI (Azure OpenAI)</h2>
-          <p class="section-desc">Ringkasan eksekutif otomatis dari model Generative AI berdasarkan anomali terdeteksi</p>
-        </div>
-        <div class="navbar-badge" style="border-color: rgba(168, 85, 247, 0.3); color: var(--accent-prediction);">
-          ⚡ Powered by Azure OpenAI
+          <h2 class="section-title"><span class="icon">🚨</span> Early Warning System (Meta Prophet AI)</h2>
+          <p class="section-desc">Prediksi 3 komoditas paling rentan mengalami lonjakan harga ekstrem dalam 90 hari ke depan</p>
         </div>
       </div>
-      <div class="glass-card ai-insight-card" id="ai-insight-panel">
-        <div class="ai-insight-content" id="ai-insight-text">Memuat analisis AI...</div>
+      <div id="early-warning-grid" class="kpi-grid" style="grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));">
+        <!-- Cards injected by JS -->
       </div>
     </section>
 
@@ -223,7 +220,7 @@
     <footer class="footer">
       <p><strong>Aceh Resilience Monitor (ARM)</strong> — Datathon Dicoding × Microsoft Elevate Training Center</p>
       <p class="mt-1">Topik: Ketahanan Pangan & Agrikultur Modern | Data: PIHPS 2023–2025</p>
-      <p class="mt-1 text-muted">Powered by Meta Prophet, Azure OpenAI & Chart.js • Deployed on Microsoft Azure Static Web Apps</p>
+      <p class="mt-1 text-muted">Powered by Meta Prophet & Chart.js • Deployed on Microsoft Azure Static Web Apps</p>
     </footer>
 
   </div>
