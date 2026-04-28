@@ -86,6 +86,7 @@ async function initApp() {
   }
 
   renderKPIs();
+  renderAIInsight();
   renderCommodityGrid();
   renderPriceTrendChart();
   renderYoYChart();
@@ -756,6 +757,25 @@ function renderCategoryAreaChart() {
       },
     },
   });
+}
+
+// ── AI Executive Summary ─────────────────────────────────────────
+function renderAIInsight() {
+  const panel = document.getElementById('ai-insight-text');
+  if (!panel) return;
+  const insight = DATA.aiInsight || 'AI Insight tidak tersedia. Silakan konfigurasi Azure OpenAI API Key.';
+  // Typing effect
+  panel.textContent = '';
+  let i = 0;
+  function typeChar() {
+    if (i < insight.length) {
+      panel.textContent += insight[i];
+      i++;
+      setTimeout(typeChar, 12);
+    }
+  }
+  // Small delay so the panel is visible first
+  setTimeout(typeChar, 500);
 }
 
 // ── Navigation between tab sections ──────────────────────────────

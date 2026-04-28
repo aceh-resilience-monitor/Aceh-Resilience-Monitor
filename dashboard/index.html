@@ -49,6 +49,22 @@
       <div id="kpi-grid" class="kpi-grid"></div>
     </section>
 
+    <!-- ── AI Executive Summary Panel ─────────────────────── -->
+    <section id="section-ai-insight">
+      <div class="section-header">
+        <div>
+          <h2 class="section-title"><span class="icon">🤖</span> Analisis AI (Azure OpenAI)</h2>
+          <p class="section-desc">Ringkasan eksekutif otomatis dari model Generative AI berdasarkan anomali terdeteksi</p>
+        </div>
+        <div class="navbar-badge" style="border-color: rgba(168, 85, 247, 0.3); color: var(--accent-prediction);">
+          ⚡ Powered by Azure OpenAI
+        </div>
+      </div>
+      <div class="glass-card ai-insight-card" id="ai-insight-panel">
+        <div class="ai-insight-content" id="ai-insight-text">Memuat analisis AI...</div>
+      </div>
+    </section>
+
     <!-- ── Status Legend ─────────────────────────────────────── -->
     <div class="legend-strip">
       <span class="text-muted" style="font-weight:600">Status Komoditas:</span>
@@ -207,7 +223,7 @@
     <footer class="footer">
       <p><strong>Aceh Resilience Monitor (ARM)</strong> — Datathon Dicoding × Microsoft Elevate Training Center</p>
       <p class="mt-1">Topik: Ketahanan Pangan & Agrikultur Modern | Data: PIHPS 2023–2025</p>
-      <p class="mt-1 text-muted">Powered by Chart.js • Built for policy intelligence</p>
+      <p class="mt-1 text-muted">Powered by Meta Prophet, Azure OpenAI & Chart.js • Deployed on Microsoft Azure Static Web Apps</p>
     </footer>
 
   </div>

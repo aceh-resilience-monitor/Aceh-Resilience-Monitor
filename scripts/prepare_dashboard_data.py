@@ -387,6 +387,103 @@ for a in anomalies[:50]:  # top 50 most recent
 future_anomalies.sort(key=lambda x: x['date'])
 alert_feed = future_anomalies + alert_feed # Predictions go first
 
+# ── 11. AI Executive Summary (Azure OpenAI) ─────────────────────
+print('Generating AI Executive Summary...')
+
+def build_anomaly_context(hist_anomalies, pred_anomalies):
+    """Build a context string from anomalies for the LLM."""
+    lines = []
+    lines.append("=== ANOMALI HISTORIS TERBARU ===")
+    for a in hist_anomalies[:5]:
+        lines.append(
+            f"- {a['shortName']}: Harga {a['price']:,.0f}, "
+            f"deviasi {a['deviation_pct']:+.1f}% dari MA30, "
+            f"severity: {a['severity']}, tanggal: {a['date']}"
+        )
+    if pred_anomalies:
+        lines.append("\n=== PREDIKSI ANOMALI 90 HARI KE DEPAN ===")
+        for a in pred_anomalies[:5]:
+            lines.append(
+                f"- {a['shortName']}: Prediksi harga {a['price']:,.0f} "
+                f"(naik {a['spike_pct']:+.1f}% dari harga saat ini {a['current_price']:,.0f}), "
+                f"tanggal: {a['date']}"
+            )
+    return "\n".join(lines)
+
+def generate_fallback_insight(hist_anomalies, pred_anomalies, kpi_data):
+    """Generate a smart fallback summary when Azure OpenAI is unavailable."""
+    critical_items = [a for a in hist_anomalies[:20] if a['severity'] == 'critical']
+    top_critical = critical_items[:3] if critical_items else hist_anomalies[:3]
+    
+    names = ", ".join(set(a['shortName'] for a in top_critical))
+    
+    pred_text = ""
+    if pred_anomalies:
+        pred_names = ", ".join(a['shortName'] for a in pred_anomalies[:3])
+        pred_text = (
+            f" Dalam 90 hari ke depan, model prediktif kami mendeteksi potensi "
+            f"lonjakan harga pada komoditas: {pred_names}. "
+            f"Disarankan untuk mempersiapkan stok cadangan dan memantau rantai distribusi."
+        )
+    
+    return (
+        f"Berdasarkan analisis sistem Aceh Resilience Monitor terhadap "
+        f"{kpi_data['totalCommodities']} komoditas pangan dengan "
+        f"{kpi_data['totalDataPoints']:,} titik data, "
+        f"terdeteksi {kpi_data['recentAnomalies']} anomali harga dalam 90 hari terakhir. "
+        f"Komoditas yang memerlukan perhatian segera: {names}. "
+        f"Terdapat {kpi_data['criticalAlerts']} komoditas berstatus KRITIS dengan "
+        f"volatilitas tinggi atau kenaikan harga di atas 20% dalam 3 tahun.{pred_text} "
+        f"Rekomendasi: Lakukan koordinasi dengan Dinas Perindustrian dan Perdagangan "
+        f"untuk operasi pasar dan stabilisasi harga pada komoditas kritis."
+    )
+
+# Attempt Azure OpenAI call
+ai_insight = ""
+AZURE_OPENAI_ENDPOINT = os.environ.get('AZURE_OPENAI_ENDPOINT', '')
+AZURE_OPENAI_API_KEY = os.environ.get('AZURE_OPENAI_API_KEY', '')
+AZURE_OPENAI_DEPLOYMENT = os.environ.get('AZURE_OPENAI_DEPLOYMENT', 'gpt-4o-mini')
+
+context_string = build_anomaly_context(anomalies, future_anomalies)
+
+if AZURE_OPENAI_ENDPOINT and AZURE_OPENAI_API_KEY:
+    try:
+        from openai import AzureOpenAI
+        client = AzureOpenAI(
+            azure_endpoint=AZURE_OPENAI_ENDPOINT,
+            api_key=AZURE_OPENAI_API_KEY,
+            api_version="2024-06-01"
+        )
+        
+        system_prompt = (
+            "Anda adalah analis ekonomi senior pemerintah Provinsi Aceh. "
+            "Berdasarkan data anomali harga pangan berikut dari sistem AI kami, "
+            "buatkan ringkasan eksekutif 1 paragraf (maksimal 150 kata) untuk Gubernur. "
+            "Sertakan: (1) komoditas mana yang paling kritis, "
+            "(2) prediksi risiko 90 hari ke depan, "
+            "(3) rekomendasi tindakan konkret. "
+            "Gunakan bahasa formal namun mudah dipahami."
+        )
+        
+        response = client.chat.completions.create(
+            model=AZURE_OPENAI_DEPLOYMENT,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": context_string}
+            ],
+            max_tokens=300,
+            temperature=0.7
+        )
+        ai_insight = response.choices[0].message.content
+        print('  ✅ AI Insight generated via Azure OpenAI')
+    except Exception as e:
+        print(f'  ⚠️ Azure OpenAI call failed: {e}')
+        ai_insight = generate_fallback_insight(anomalies, future_anomalies, kpi)
+        print('  ℹ️ Using fallback insight (data-driven summary)')
+else:
+    ai_insight = generate_fallback_insight(anomalies, future_anomalies, kpi)
+    print('  ℹ️ Azure OpenAI keys not set. Using fallback insight (data-driven summary)')
+
 # ── Assemble & Save ─────────────────────────────────────────────
 dashboard_data = {
     'kpi': kpi,
@@ -403,6 +500,7 @@ dashboard_data = {
     'forecasts': forecasts,
     'categories': list(sorted(set(CATEGORY_MAP.values()))),
     'categoryIcons': CATEGORY_ICONS,
+    'aiInsight': ai_insight,
 }
 
 os.makedirs(DASHBOARD_DIR, exist_ok=True)

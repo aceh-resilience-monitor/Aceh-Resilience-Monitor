@@ -1038,3 +1038,36 @@ body::before {
   display: block;
   animation: fadeInUp 0.3s ease;
 }
+
+/* ── AI Insight Panel ────────────────────────────────────── */
+.ai-insight-card {
+  border-color: rgba(168, 85, 247, 0.2);
+  background: linear-gradient(135deg, rgba(168, 85, 247, 0.05) 0%, rgba(17, 24, 39, 0.7) 100%);
+  position: relative;
+  overflow: hidden;
+}
+
+.ai-insight-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, var(--accent-prediction), var(--accent-cyan), var(--accent-prediction));
+  background-size: 200% 100%;
+  animation: shimmer 3s linear infinite;
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.ai-insight-content {
+  font-size: 14px;
+  line-height: 1.8;
+  color: var(--text-secondary);
+  padding: 8px 0;
+  min-height: 60px;
+}
