@@ -1,53 +1,59 @@
+### Project Brief Datathon
+**Microsoft Elevate Training Center**
 
-Project Brief Datathon
-Microsoft Elevate Training Center
+**Informasi Peserta**
+*(Silakan isi tabel ini dengan nama dan email Dicoding kalian bertiga di dokumen asli)*
+*   Aulia Muzhaffar (AI Engineer & Data Scientist)
+*   Ilhaam (Data Engineer & Frontend Developer)
+*   Arieff (Project Manager)
 
-Informasi Peserta
-(Silakan isi tabel ini dengan nama dan email Dicoding kalian bertiga di dokumen asli)
+**Topik:** Ketahanan Pangan & Agrikultur Modern
 
-Topik : Ketahanan Pangan & Agrikultur Modern
+---
 
-Ringkasan Eksekutif
-Volatilitas harga pangan strategis sering kali memicu lonjakan inflasi daerah. Dalam praktiknya, pengambilan keputusan oleh pemangku kebijakan (seperti Tim Pengendalian Inflasi Daerah/TPID) sering terhambat oleh lambatnya integrasi data yang tersebar (silo) antara pusat informasi harga seperti PIHPS dan SP2KP.
+**Ringkasan Eksekutif**
+Volatilitas harga pangan strategis sering kali memicu lonjakan inflasi daerah. Dalam praktiknya, pengambilan keputusan oleh pemangku kebijakan (seperti Tim Pengendalian Inflasi Daerah/TPID) sering terhambat oleh lambatnya integrasi data dan ketidakmampuan untuk memprediksi tren harga di masa depan berdasarkan data historis.
 
-Problem Statement: Bagaimana menyatukan aliran data disparitas harga komoditas secara real-time untuk mendeteksi anomali dan memberikan rekomendasi intervensi pasar yang tepat sasaran di kawasan perkotaan?
+**Problem Statement:** Bagaimana menyatukan aliran data historis harga 18 komoditas pangan strategis untuk mendeteksi anomali secara *real-time* dan memprediksi lonjakan harga di masa depan guna memberikan rekomendasi intervensi pasar yang proaktif?
 
-Research Questions: 1. Komoditas apa saja yang menunjukkan anomali harga tertinggi di luar tren musiman normal?
-2. Kapan dan di pasar mana intervensi (seperti operasi pasar murah) harus segera dilakukan sebelum inflasi bulanan tidak terkendali?
+**Research Questions:** 
+1. Komoditas apa saja yang saat ini menunjukkan anomali harga tertinggi (kritis) di luar kewajaran pergerakan rata-rata (Moving Average)?
+2. Komoditas apa yang diprediksi oleh *Machine Learning* akan mengalami lonjakan harga terekstrem dalam 90 hari ke depan?
 
-Proyek ini bertindak sebagai painkiller, bukan sekadar vitamin. Tanpa adanya sistem visibilitas data yang terpusat dan otomatis, birokrasi pemerintahan sering kali terlambat menyadari lonjakan harga hingga dampaknya sudah memukul daya beli masyarakat. Solusi ini memberikan instrumen mitigasi proaktif yang siap pakai untuk menstabilkan perekonomian daerah.
+Proyek ini bertindak sebagai *painkiller*, bukan sekadar *vitamin*. Tanpa adanya sistem visibilitas data dan kecerdasan buatan, birokrasi sering kali bertindak reaktif saat harga sudah melambung. Solusi ini memberikan instrumen mitigasi proaktif yang siap pakai untuk menstabilkan perekonomian daerah sebelum inflasi terjadi.
 
-Deskripsi Project
-Aceh Resilience Monitor (ARM) adalah sebuah platform intelijen bisnis end-to-end yang dirancang untuk mendeteksi anomali harga pangan strategis di pasar-pasar utama.
+---
 
-Fungsi utama produk ini adalah menyedot data dari berbagai portal pemerintah, memprosesnya dalam satu "danau data" terpusat, dan menyajikan metrik peringatan dini. ARM menyelesaikan masalah kelambatan respons birokrasi dengan mengubah data mentah harian menjadi sinyal eksekusi intervensi pasar yang instan.
+**Deskripsi Project**
+Aceh Resilience Monitor (ARM) adalah sebuah platform intelijen bisnis *end-to-end* yang dirancang untuk mendeteksi anomali dan melakukan *forecasting* harga pada 18 komoditas pangan strategis di Provinsi Aceh.
 
-Fitur Utama dan Teknologi yang Digunakan
+Fungsi utama produk ini adalah memproses data harga historis (2023-2025), mendeteksi simpangan anomali statistik, dan meramalkan tren menggunakan *Machine Learning*. ARM menyelesaikan masalah kelambatan birokrasi dengan mengubah data tersebut menjadi "Early Warning System (Sistem Peringatan Dini)" yang memberikan rekomendasi intervensi pasar secara instan di layar pembuat kebijakan.
 
-Automated Data Pipeline (Microsoft Fabric - Data Factory): Penarikan data otomatis secara berkala dari API PIHPS dan SP2KP tanpa intervensi manual.
+---
 
-Single Source of Truth Storage (Microsoft Fabric - OneLake): Penyimpanan data berformat Delta Parquet untuk efisiensi pemrosesan tingkat lanjut.
+**Fitur Utama dan Teknologi yang Digunakan**
 
-Price Anomaly Detection (Synapse Data Science): Implementasi algoritma machine learning untuk mendeteksi lonjakan harga yang tidak wajar (di luar batas toleransi statistik).
+*   **Automated ETL Pipeline (Python & Pandas):** Skrip pemrosesan data otomatis untuk membersihkan dan menstrukturisasi jutaan baris data harga mentah harian menjadi dataset siap analisis.
+*   **Time-Series Forecasting & Anomaly Detection (Meta Prophet):** Implementasi model *Machine Learning* untuk mendeteksi lonjakan harga abnormal (menggunakan perhitungan *Z-Score*) dan memprediksi pergerakan harga 18 komoditas selama 90 hari ke depan secara akurat (MAPE 7.74%).
+*   **Cloud Data Lake (Azure Blob Storage - *Direncanakan*):** Infrastruktur penyimpanan *cloud-native* terpusat untuk mendistribusikan *output* data JSON hasil prediksi AI ke aplikasi.
+*   **Real-time Executive Dashboard (HTML, JS, Chart.js):** Visualisasi data premium berdesain *glassmorphism* interaktif tanpa *latency*, menyajikan metrik tren, volatilitas, dan perbandingan YoY (*Year-over-Year*).
+*   **Predictive Early Warning System (Vanilla JS Logic):** Panel peringatan interaktif berbasis probabilitas AI yang secara otomatis menyortir dan menyoroti komoditas dengan prediksi lonjakan harga ekstrem (misal: >15%), lengkap dengan rekomendasi tindakan.
+*   **Cloud Hosting (Azure Static Web Apps):** *Deployment dashboard* yang *scalable*, aman, dan dapat diakses dari peramban mana pun secara global.
 
-Real-time Executive Dashboard (Power BI DirectLake): Visualisasi sebaran harga per pasar tanpa loading latency, dirancang khusus untuk layar pembuat kebijakan.
+---
 
-Automated Early Warning System (Data Activator): Pengiriman notifikasi otomatis ketika harga komoditas menyentuh ambang batas kritis.
+**Cara Penggunaan Product**
 
-Cara Penggunaan Product
+1.  Pengguna (Pemangku kebijakan/TPID) membuka tautan *dashboard* ARM melalui peramban web (*browser*).
+2.  Pada bagian atas halaman, pengguna langsung disambut oleh panel **"Early Warning System"** yang menyoroti Top 3 komoditas dengan prediksi lonjakan harga terekstrem di masa depan (dilengkapi label 🔴 EKSTREM atau 🟡 WASPADA).
+3.  Pengguna dapat mengklik tombol **"Lihat Semua Prediksi"** untuk membuka modal/tabel detail yang membandingkan harga saat ini dengan harga prediksi AI 90 hari ke depan.
+4.  Menggulir ke bawah, pengguna melihat **Grid Status Komoditas** yang memantau kondisi terkini 18 komoditas (Aman/Waspada/Kritis) berdasarkan anomali harian (*Z-Score*).
+5.  Pengguna dapat memanfaatkan grafik interaktif (Tren Harga, Kontribusi Kategori) untuk menganalisis pergerakan pasar secara *drill-down* menggunakan filter kategori di layar.
 
-Pengguna (Pemangku kebijakan/Dinas terkait) membuka link dashboard ARM melalui peramban web.
+---
 
-Pada halaman utama, pengguna langsung melihat peta kota dengan titik-titik pasar (misal: Pasar Peunayong, Pasar Lambaro) yang memiliki indikator warna (Hijau: Aman, Kuning: Waspada, Merah: Kritis).
+**Informasi Pendukung [Opsional]**
 
-Pengguna mengklik pasar dengan indikator "Merah" untuk melihat komoditas apa yang memicu peringatan (contoh: Cabai Merah).
+**Studi Kasus Pengguna:** Menjelang periode kuartal pertama 2026, TPID Provinsi Aceh perlu mengantisipasi inflasi. Saat membuka *dashboard* ARM, sistem EWS (*Early Warning System*) mengeluarkan peringatan 🔴 EKSTREM untuk komoditas Cabai Merah karena model *Prophet* memprediksi adanya anjakan harga hingga +80.4% dalam 90 hari ke depan. Berbekal rekomendasi "Siapkan stok cadangan" yang tertera di *dashboard*, dinas terkait langsung menjadwalkan inspeksi rantai pasok keesokan paginya jauh sebelum harga cabai benar-benar meledak di pasar.
 
-Pengguna melihat grafik proyeksi dan anomali, lalu menggunakan tombol "Ekspor Laporan" untuk membagikan data tersebut sebagai dasar rapat operasi pasar hari itu.
-
-Secara paralel, jika pengguna tidak sedang membuka dashboard, sistem akan otomatis mengirimkan peringatan via email/Microsoft Teams apabila terjadi anjakan harga harian yang drastis.
-
-Informasi Pendukung [Opsional]
-
-Studi Kasus Pengguna: Menjelang hari besar keagamaan, TPID Kota Banda Aceh perlu memantau pergerakan harga daging sapi dan bawang merah. Melalui notifikasi ARM, TPID mengetahui adanya lonjakan harga 15% di Pasar Aceh dalam 2 hari terakhir, sehingga langsung menjadwalkan inspeksi rantai pasok keesokan paginya.
-
-Rencana pengembangan ke depan: Mengintegrasikan data anomali cuaca lokal (curah hujan) sebagai variabel tambahan dalam model forecasting untuk memprediksi potensi gagal panen di daerah pemasok.
+**Rencana pengembangan ke depan:** Mengintegrasikan data eksternal seperti anomali cuaca lokal (curah hujan) dan indeks harga BBM sebagai regressor tambahan dalam model prediksi *Prophet* untuk meningkatkan akurasi visibilitas terhadap potensi gagal panen atau kendala logistik.
