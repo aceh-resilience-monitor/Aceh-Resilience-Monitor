@@ -4,7 +4,7 @@
 | No | Nama | Email Dicoding | Peran Utama |
 |---|---|---|---|
 | 1 | Aulia Muzhaffar | auliamuzhaffar@gmail.com | Machine Learning & Analytics (Forecasting Prophet, Evaluasi Model, EWS Logic) |
-| 2 | Muhammad Ilhaam Ghiffari | *(Menunggu konfirmasi)* | Data Engineering & Frontend (Data Pipeline ETL, Dashboard UI/UX, Z-Score Anomaly) |
+| 2 | Muhammad Ilhaam Ghiffari | ilhaamghiffari@gmail.com | Data Engineering & Frontend (Data Pipeline ETL, Dashboard UI/UX, Z-Score Anomaly) |
 | 3 | Arief Hidayah | ariefhidayahm@gmail.com | Data Acquisition & Repo Manager (Scraping Data, GitHub Repository Management) |
 
 **Topik:** Ketahanan Pangan & Agrikultur Modern
