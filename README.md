@@ -202,7 +202,7 @@ datathon-dicoding/
 |------|-------|------------------|
 | **Aulia Muzhaffar** | ML Engineer & Analytics | Forecasting Prophet (18 model, 1 per komoditas), Early Warning System (EWS) Logic, Evaluasi Model (MAE/RMSE/MAPE), Azure Blob Storage, Bug Fixing Dashboard |
 | **Muhammad Ilhaam Ghiffary** | Data Engineer & Frontend | EDA & Notebook Analytics, Data Pipeline ETL, Z-Score Anomaly Detection, Desain & Pengembangan Dashboard UI/UX |
-| **Arief Hidayah** | Data Acquisition & Repo Manager | Scraping Data Komoditas, Manajemen Repository GitHub |
+| **Muhammad Arief Hidayah** | Data Acquisition & Repo Manager | Scraping Data Komoditas, Manajemen Repository GitHub |
 
 ---
 
