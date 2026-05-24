@@ -12,8 +12,8 @@ const {
 const REGENCY_IDS = [1, 2, 3];
 const PRICE_TYPE_IDS = [1, 2, 3, 4];
 
-const runBackfill = async () => {
-    logMessage('[INFO] Starting backfill process...');
+const runWeeklySync = async () => {
+    logMessage('[INFO] Starting weekly sync process...');
 
     const startDateStr = dayjs().subtract(7, 'day').format('YYYY-MM-DD');
     const endDateStr = dayjs().format('YYYY-MM-DD');
@@ -65,14 +65,14 @@ const runBackfill = async () => {
         currentDate = currentDate.add(1, 'day');
     }
 
-    logMessage('[INFO] Backfill completed successfully!');
+    logMessage('[INFO] Weekly sync completed successfully!');
 };
 
 // Only auto-run when executed directly (not when required by tests)
 if (require.main === module) {
-    runBackfill().catch(err => {
-        logMessage(`[FATAL] Backfill error: ${err.message}`, true);
+    runWeeklySync().catch(err => {
+        logMessage(`[FATAL] Weekly sync error: ${err.message}`, true);
     });
 }
 
-module.exports = { runBackfill, REGENCY_IDS, PRICE_TYPE_IDS };
+module.exports = { runWeeklySync, REGENCY_IDS, PRICE_TYPE_IDS };

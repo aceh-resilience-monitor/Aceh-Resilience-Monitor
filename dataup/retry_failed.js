@@ -118,6 +118,11 @@ const runRetryFailed = async () => {
     logMessage('[INFO] Finished retrying failed requests.');
 };
 
-runRetryFailed().catch(err => {
-    logMessage(`[FATAL] Retry failed error: ${err.message}`, true);
-});
+// Only auto-run when executed directly (not when required by tests)
+if (require.main === module) {
+    runRetryFailed().catch(err => {
+        logMessage(`[FATAL] Retry failed error: ${err.message}`, true);
+    });
+}
+
+module.exports = { runRetryFailed, generateKey };
