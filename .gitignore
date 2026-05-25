@@ -13,6 +13,12 @@ __pycache__/
 .venv/
 venv/
 env/
+.pytest_cache/
+
+# ===========================
+# Deprecated / Unused
+# ===========================
+fabric_migration/
 
 # ===========================
 # Node.js
@@ -55,4 +61,14 @@ local.settings.json
 *.pem
 *.key
 *.cert
+
+# ===========================
+# Project Specific Excludes
+# ===========================
+.coverage
+ai_agent_masterguide.md
+git_guide.md
+modul_implementation.md
+dataup/data/
+
 
