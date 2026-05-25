@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Aceh Resilience Monitor — Dashboard Intelijen Harga Pangan</title>
-  <meta name="description" content="Platform intelijen bisnis end-to-end untuk mendeteksi anomali harga pangan strategis di pasar-pasar utama Aceh. Pantau 18 komoditas pangan secara real-time.">
+  <meta name="description" content="Platform intelijen bisnis end-to-end untuk mendeteksi anomali harga pangan strategis di pasar-pasar utama Aceh. Pantau 21 komoditas pangan dengan update harian otomatis.">
 
   <!-- Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -39,7 +39,16 @@
         </div>
       </div>
       <div class="navbar-meta">
-        <div class="navbar-badge live">Monitoring Aktif</div>
+        <div class="region-select-wrap">
+          <span style="margin-right: 6px; font-size: 14px;">📍</span>
+          <select id="region-selector" class="region-select" onchange="changeRegion(this.value)">
+            <option value="aggregated">Seluruh Provinsi (Rata-rata)</option>
+            <option value="Banda Aceh">Banda Aceh</option>
+            <option value="Lhokseumawe">Lhokseumawe</option>
+            <option value="Meulaboh">Meulaboh</option>
+          </select>
+        </div>
+        <div class="navbar-badge live">Update Harian Otomatis</div>
         <div class="navbar-date" id="data-date-range">—</div>
       </div>
     </nav>
@@ -92,6 +101,29 @@
 
     <!-- ── Commodity Detail Panel (hidden by default) ────────── -->
     <div id="detail-panel" class="detail-panel"></div>
+
+    <!-- ── Analisis Komparatif Regional & Margin Rantai Pasok (Tier 2/3) ── -->
+    <section id="section-regional-analysis" class="mb-4">
+      <div class="section-header">
+        <div>
+          <h2 class="section-title"><span class="icon">📍</span> Analisis Komparatif Regional & Margin Rantai Pasok</h2>
+          <p class="section-desc" id="regional-analysis-subtitle">Perbandingan harga antar daerah utama dan analisis margin rantai pasok untuk komoditas terpilih</p>
+        </div>
+      </div>
+      <div class="two-col" style="grid-template-columns: 1fr 1.2fr; gap: 16px;">
+        
+        <!-- A. Peta Disparitas Harga (3-Column Comparison) -->
+        <div class="glass-card" id="card-regional-disparity" style="display: flex; flex-direction: column; justify-content: space-between; min-height: 280px; padding: 24px;">
+          <!-- Injected by JS -->
+        </div>
+
+        <!-- B. Price Source Margin Analysis (Markup Chain Flow) -->
+        <div class="glass-card" id="card-margin-analysis" style="display: flex; flex-direction: column; justify-content: space-between; min-height: 280px; padding: 24px;">
+          <!-- Injected by JS -->
+        </div>
+
+      </div>
+    </section>
 
     <!-- ── Price Trend Chart ─────────────────────────────────── -->
     <section id="section-trends">

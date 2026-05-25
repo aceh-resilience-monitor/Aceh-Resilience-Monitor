@@ -1071,3 +1071,116 @@ body::before {
   padding: 8px 0;
   min-height: 60px;
 }
+
+/* ── Region Select & Supply Chain ── */
+.region-select-wrap {
+  display: flex;
+  align-items: center;
+  background: var(--bg-glass);
+  border: 1px solid var(--border-glass);
+  padding: 6px 14px;
+  border-radius: 20px;
+  transition: all var(--transition-fast);
+}
+
+.region-select-wrap:hover {
+  border-color: var(--border-hover);
+}
+
+.region-select {
+  background: transparent;
+  border: none;
+  color: var(--text-primary);
+  font-family: 'Inter', sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  outline: none;
+}
+
+.region-select option {
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+}
+
+/* Supply Chain Flow CSS */
+.supply-chain-flow {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 20px;
+  background: rgba(255, 255, 255, 0.01);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border-glass);
+  margin-top: 24px;
+}
+
+.supply-chain-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.supply-chain-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+}
+
+.supply-chain-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-glass);
+  border-radius: var(--radius-md);
+  padding: 14px 12px;
+  text-align: center;
+  position: relative;
+  transition: all var(--transition-normal);
+}
+
+.supply-chain-card:hover {
+  transform: translateY(-2px);
+  border-color: var(--border-hover);
+}
+
+.supply-chain-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  border-radius: var(--radius-md) var(--radius-md) 0 0;
+}
+
+.supply-chain-card.source-produsen::before { background: var(--status-normal); }
+.supply-chain-card.source-pedagang-besar::before { background: var(--accent-teal); }
+.supply-chain-card.source-pasar-tradisional::before { background: var(--status-warning); }
+.supply-chain-card.source-pasar-modern::before { background: var(--status-critical); }
+
+.supply-chain-role {
+  font-size: 11px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  margin-bottom: 8px;
+}
+
+.supply-chain-price {
+  font-size: 16px;
+  font-weight: 700;
+  font-family: 'JetBrains Mono', monospace;
+  color: var(--text-primary);
+}
+
+.supply-chain-spread {
+  font-size: 11px;
+  color: var(--status-critical);
+  margin-top: 6px;
+  font-weight: 600;
+  background: rgba(239, 68, 68, 0.08);
+  padding: 2px 6px;
+  border-radius: 4px;
+  display: inline-block;
+}
+

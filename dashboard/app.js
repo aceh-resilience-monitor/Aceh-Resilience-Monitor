@@ -9,6 +9,26 @@ let charts = {};
 let selectedCommodity = null;
 let activeCategory = 'all';
 let showForecast = false;
+let selectedRegion = 'aggregated';
+
+function changeRegion(region) {
+  selectedRegion = region;
+  renderCommodityGrid();
+  
+  if (selectedCommodity) {
+    showCommodityDetail(selectedCommodity);
+    renderRegionalAnalysis(selectedCommodity);
+  } else {
+    updatePriceTrendChart();
+    renderRegionalAnalysis('Cabai Merah Keriting');
+  }
+
+  // Smooth scroll to Commodity Status Section
+  const target = document.getElementById('section-status');
+  if (target) {
+    target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+}
 
 // ── Color Palettes ───────────────────────────────────────────────
 const CATEGORY_COLORS = {
@@ -103,6 +123,7 @@ async function initApp() {
   renderAlertFeed();
   renderAnomalyTable();
   renderCategoryAreaChart();
+  renderRegionalAnalysis('Cabai Merah Keriting');
 
   // Update date display
   document.getElementById('data-date-range').textContent =
@@ -209,7 +230,11 @@ function renderEarlyWarning() {
       <div class="kpi-card" style="border-top: 4px solid ${borderColor}; position: relative; overflow: hidden; background: linear-gradient(145deg, rgba(30, 41, 59, 0.7) 0%, rgba(15, 23, 42, 0.9) 100%);">
         <div style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(135deg, ${bgGlow} 0%, transparent 100%); pointer-events: none;"></div>
         <div class="kpi-title" style="display: flex; align-items: center; justify-content: space-between; font-weight: 600;">
-          <span style="font-size: 1.1rem;">${icon} ${p.shortName}</span>
+          <span style="font-size: 1.05rem; display: flex; align-items: center; gap: 4px;">
+            <span>${icon}</span>
+            <span>${p.shortName}</span>
+            ${p.daerah ? `<span style="font-size: 0.75rem; color: var(--text-muted); font-weight: normal; margin-left: 2px;">[${p.daerah}]</span>` : ''}
+          </span>
           <span style="font-size: 0.7rem; padding: 2px 8px; border-radius: 12px; background: ${badgeBg}; color: ${textColor}; font-weight: bold; border: 1px solid ${badgeBorder};">${badge}</span>
         </div>
         <div class="kpi-value" style="color: ${textColor}; font-size: 2rem; margin-top: 0.8rem; text-shadow: 0 0 12px ${bgGlow};">
@@ -274,7 +299,10 @@ function showAllPredictionsModal() {
           onmouseover="this.style.background='rgba(255,255,255,0.04)'"
           onmouseout="this.style.background='transparent'">
         <td style="padding: 10px 12px; color: #94a3b8; font-size: 0.8rem;">${i + 1}</td>
-        <td style="padding: 10px 12px; font-weight: 600;">${icon} ${p.shortName}</td>
+        <td style="padding: 10px 12px; font-weight: 600;">
+          ${icon} ${p.shortName}
+          ${p.daerah ? `<span style="font-size: 0.75rem; color: var(--text-muted); font-weight: normal; margin-left: 4px;">[${p.daerah}]</span>` : ''}
+        </td>
         <td style="padding: 10px 12px; color: ${textColor}; font-weight: 700; font-size: 1.05rem;">+${p.spike_pct.toFixed(1)}%</td>
         <td style="padding: 10px 12px; color: #cbd5e1;">${formatPrice(p.current_price)}</td>
         <td style="padding: 10px 12px; color: ${textColor}; font-weight: 600;">${formatPrice(p.price)}</td>
@@ -342,7 +370,27 @@ function closePredictionsModal() {
 // ── Render Commodity Status Grid ─────────────────────────────────
 function renderCommodityGrid() {
   const grid = document.getElementById('commodity-grid');
-  const cards = DATA.commodityCards;
+  let cards = DATA.commodityCards;
+
+  // Remap cards for specific region (Tier 2 regional support)
+  if (selectedRegion && selectedRegion !== 'aggregated') {
+    cards = cards.map(c => {
+      const regData = DATA.regional[c.commodity] ? DATA.regional[c.commodity][selectedRegion] : null;
+      if (regData) {
+        let status = 'normal';
+        if (regData.cv > 15) status = 'critical';
+        else if (regData.cv > 5) status = 'warning';
+        return {
+          ...c,
+          latestPrice: regData.latestPrice || 0,
+          cvLatest: regData.cv || 0,
+          status: status,
+          recentAnomalies: 0  // region specific anomalies
+        };
+      }
+      return c;
+    });
+  }
 
   // Sort: critical first, then warning, then normal
   const order = { critical: 0, warning: 1, normal: 2 };
@@ -362,7 +410,7 @@ function renderCommodityGrid() {
         <span class="commodity-change ${getChangeClass(c.totalChange)}">
           ${formatChange(c.totalChange)}
         </span>
-        <span class="commodity-cv">CV ${c.cv2025}%</span>
+        <span class="commodity-cv">CV ${c.cvLatest}%</span>
       </div>
       <div class="mt-1">
         <span class="status-badge ${c.status}">
@@ -382,6 +430,7 @@ function selectCommodity(commodity) {
     document.querySelectorAll('.commodity-card').forEach(c => c.classList.remove('selected'));
     document.getElementById('detail-panel').classList.remove('active');
     updatePriceTrendChart();
+    renderRegionalAnalysis('Cabai Merah Keriting');
     return;
   }
 
@@ -395,6 +444,9 @@ function selectCommodity(commodity) {
   // Show detail panel
   showCommodityDetail(commodity);
 
+  // Update regional analysis
+  renderRegionalAnalysis(commodity);
+
   // Update price chart to show only this commodity
   updatePriceTrendChart(commodity);
 
@@ -404,10 +456,81 @@ function selectCommodity(commodity) {
 
 function showCommodityDetail(commodity) {
   const panel = document.getElementById('detail-panel');
-  const card = DATA.commodityCards.find(c => c.commodity === commodity);
-  const ts = DATA.timeseries[commodity];
+  let card = DATA.commodityCards.find(c => c.commodity === commodity);
+  
+  // Remap card values for regional view
+  if (selectedRegion && selectedRegion !== 'aggregated') {
+    const regData = DATA.regional[commodity] ? DATA.regional[commodity][selectedRegion] : null;
+    if (regData) {
+      let status = 'normal';
+      if (regData.cv > 15) status = 'critical';
+      else if (regData.cv > 5) status = 'warning';
+      card = {
+        ...card,
+        latestPrice: regData.latestPrice || 0,
+        cvLatest: regData.cv || 0,
+        status: status
+      };
+    }
+  }
+
   const vol = DATA.volatility[commodity];
   const anomalies = DATA.anomalies.filter(a => a.commodity === commodity).slice(0, 15);
+
+  // Supply Chain Price-by-Source (Tier 3 supply chain monitoring)
+  const sourceData = DATA.priceBySource[commodity] || {};
+  const hasSourceData = Object.keys(sourceData).length > 0;
+  let supplyChainHtml = '';
+  if (hasSourceData) {
+    const prodPrice = sourceData['Produsen'] ? sourceData['Produsen'].latestPrice : null;
+    const bigPrice = sourceData['Pedagang Besar'] ? sourceData['Pedagang Besar'].latestPrice : null;
+    const tradPrice = sourceData['Pasar Tradisional'] ? sourceData['Pasar Tradisional'].latestPrice : null;
+    const modPrice = sourceData['Pasar Modern'] ? sourceData['Pasar Modern'].latestPrice : null;
+    
+    let spreadHtml = '';
+    if (prodPrice && tradPrice) {
+      const spreadPct = ((tradPrice - prodPrice) / prodPrice * 100).toFixed(1);
+      spreadHtml = `<span style="font-size: 11px; color: #f43f5e; font-weight: 600; background: rgba(244, 63, 94, 0.12); border: 1px solid rgba(244, 63, 94, 0.2); padding: 4px 10px; border-radius: 20px; display: inline-flex; align-items: center; gap: 4px;">📈 Margin Rantai Pasok: +${spreadPct}%</span>`;
+    }
+    
+    supplyChainHtml = `
+      <div style="display: flex; flex-direction: column; gap: 16px; padding: 20px; background: rgba(30, 41, 59, 0.4); border-radius: 12px; border: 1px solid rgba(255, 255, 255, 0.08); margin-top: 24px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+          <h4 style="margin: 0; display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 700; color: #f1f5f9;">
+            <span style="font-size: 16px;">⛓️</span> Rantai Pasok & Disparitas Harga (Berdasarkan Sumber)
+          </h4>
+          ${spreadHtml}
+        </div>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px;">
+          
+          <!-- Petani/Produsen -->
+          <div style="background: ${prodPrice ? 'rgba(16, 185, 129, 0.04)' : 'rgba(255, 255, 255, 0.01)'}; border: 1px solid ${prodPrice ? 'rgba(16, 185, 129, 0.15)' : 'rgba(255, 255, 255, 0.05)'}; border-top: 4px solid ${prodPrice ? '#10b981' : '#475569'}; border-radius: 8px; padding: 14px 12px; text-align: center; position: relative; transition: all 0.2s;">
+            <div style="font-size: 11px; color: #94a3b8; text-transform: uppercase; font-weight: 700; letter-spacing: 0.05em; margin-bottom: 8px;">🌾 Petani/Produsen</div>
+            <div style="font-size: 16px; font-weight: 700; font-family: 'JetBrains Mono', monospace; color: ${prodPrice ? '#10b981' : '#64748b'};">${prodPrice ? formatPrice(prodPrice) : 'Tidak ada data'}</div>
+          </div>
+          
+          <!-- Pedagang Besar -->
+          <div style="background: ${bigPrice ? 'rgba(20, 184, 166, 0.04)' : 'rgba(255, 255, 255, 0.01)'}; border: 1px solid ${bigPrice ? 'rgba(20, 184, 166, 0.15)' : 'rgba(255, 255, 255, 0.05)'}; border-top: 4px solid ${bigPrice ? '#14b8a6' : '#475569'}; border-radius: 8px; padding: 14px 12px; text-align: center; position: relative; transition: all 0.2s;">
+            <div style="font-size: 11px; color: #94a3b8; text-transform: uppercase; font-weight: 700; letter-spacing: 0.05em; margin-bottom: 8px;">🏢 Pedagang Besar</div>
+            <div style="font-size: 16px; font-weight: 700; font-family: 'JetBrains Mono', monospace; color: ${bigPrice ? '#14b8a6' : '#64748b'};">${bigPrice ? formatPrice(bigPrice) : 'Tidak ada data'}</div>
+          </div>
+          
+          <!-- Pasar Tradisional -->
+          <div style="background: ${tradPrice ? 'rgba(245, 158, 11, 0.04)' : 'rgba(255, 255, 255, 0.01)'}; border: 1px solid ${tradPrice ? 'rgba(245, 158, 11, 0.15)' : 'rgba(255, 255, 255, 0.05)'}; border-top: 4px solid ${tradPrice ? '#f59e0b' : '#475569'}; border-radius: 8px; padding: 14px 12px; text-align: center; position: relative; transition: all 0.2s;">
+            <div style="font-size: 11px; color: #94a3b8; text-transform: uppercase; font-weight: 700; letter-spacing: 0.05em; margin-bottom: 8px;">🧺 Pasar Tradisional</div>
+            <div style="font-size: 16px; font-weight: 700; font-family: 'JetBrains Mono', monospace; color: ${tradPrice ? '#f59e0b' : '#64748b'};">${tradPrice ? formatPrice(tradPrice) : 'Tidak ada data'}</div>
+          </div>
+          
+          <!-- Pasar Modern -->
+          <div style="background: ${modPrice ? 'rgba(236, 72, 153, 0.04)' : 'rgba(255, 255, 255, 0.01)'}; border: 1px solid ${modPrice ? 'rgba(236, 72, 153, 0.15)' : 'rgba(255, 255, 255, 0.05)'}; border-top: 4px solid ${modPrice ? '#ec4899' : '#475569'}; border-radius: 8px; padding: 14px 12px; text-align: center; position: relative; transition: all 0.2s;">
+            <div style="font-size: 11px; color: #94a3b8; text-transform: uppercase; font-weight: 700; letter-spacing: 0.05em; margin-bottom: 8px;">🛒 Pasar Modern</div>
+            <div style="font-size: 16px; font-weight: 700; font-family: 'JetBrains Mono', monospace; color: ${modPrice ? '#ec4899' : '#64748b'};">${modPrice ? formatPrice(modPrice) : 'Tidak ada data'}</div>
+          </div>
+          
+        </div>
+      </div>
+    `;
+  }
 
   panel.classList.add('active');
   panel.innerHTML = `
@@ -427,12 +550,12 @@ function showCommodityDetail(commodity) {
           <div class="kpi-value teal" style="font-size:20px">${formatPrice(card.latestPrice)}</div>
         </div>
         <div class="kpi-card ${card.totalChange > 20 ? 'red' : 'blue'}">
-          <div class="kpi-label">Perubahan 3 Tahun</div>
+          <div class="kpi-label">Total Perubahan</div>
           <div class="kpi-value ${card.totalChange > 20 ? 'red' : 'blue'}" style="font-size:20px">${formatChange(card.totalChange)}</div>
         </div>
-        <div class="kpi-card ${card.cv2025 > 15 ? 'red' : 'yellow'}">
-          <div class="kpi-label">Volatilitas 2025 (CV)</div>
-          <div class="kpi-value ${card.cv2025 > 15 ? 'red' : 'yellow'}" style="font-size:20px">${card.cv2025}%</div>
+        <div class="kpi-card ${card.cvLatest > 15 ? 'red' : 'yellow'}">
+          <div class="kpi-label">Volatilitas Terbaru (CV)</div>
+          <div class="kpi-value ${card.cvLatest > 15 ? 'red' : 'yellow'}" style="font-size:20px">${card.cvLatest}%</div>
         </div>
         <div class="kpi-card purple">
           <div class="kpi-label">Anomali (90 Hari)</div>
@@ -442,9 +565,9 @@ function showCommodityDetail(commodity) {
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px" class="mt-2">
         <div>
           <h4 class="mb-1">📊 Volatilitas Per Tahun</h4>
-          <div class="stat-row"><span class="stat-label">2023</span><span class="stat-value">${vol['2023']}%</span></div>
-          <div class="stat-row"><span class="stat-label">2024</span><span class="stat-value">${vol['2024']}%</span></div>
-          <div class="stat-row"><span class="stat-label">2025</span><span class="stat-value">${vol['2025']}%</span></div>
+          ${Object.keys(vol).filter(k => !isNaN(k)).sort().map(year => `
+            <div class="stat-row"><span class="stat-label">${year}</span><span class="stat-value">${vol[year]}%</span></div>
+          `).join('')}
         </div>
         <div>
           <h4 class="mb-1">⚠️ Anomali Terdeteksi</h4>
@@ -462,8 +585,231 @@ function showCommodityDetail(commodity) {
           }
         </div>
       </div>
+      ${supplyChainHtml}
     </div>
   `;
+}
+
+// ── Analisis Komparatif Regional & Margin Rantai Pasok (Tier 2/3) ──
+function renderRegionalAnalysis(commodity) {
+  const card = DATA.commodityCards.find(c => c.commodity === commodity) || { icon: '📦' };
+  const icon = card.icon;
+
+  // Update subtitle
+  const subtitleEl = document.getElementById('regional-analysis-subtitle');
+  if (subtitleEl) {
+    subtitleEl.innerHTML = `Perbandingan harga antar daerah utama dan analisis margin rantai pasok untuk <strong>${icon} ${commodity}</strong>`;
+  }
+
+  // 1. A. Peta Disparitas Harga (3-Column Comparison Grid)
+  const regionalData = DATA.regional[commodity] || {};
+  const regions = ['Banda Aceh', 'Lhokseumawe', 'Meulaboh'];
+  let prices = {};
+  let changes = {};
+  let cvs = {};
+
+  regions.forEach(r => {
+    const rData = regionalData[r];
+    if (rData && rData.prices && rData.prices.length > 0) {
+      prices[r] = rData.latestPrice;
+      cvs[r] = rData.cv;
+      const histPrices = rData.prices;
+      const prevPrice = histPrices.length >= 30 ? histPrices[histPrices.length - 30] : histPrices[0];
+      changes[r] = prevPrice ? ((rData.latestPrice - prevPrice) / prevPrice * 100) : 0;
+    } else {
+      prices[r] = null;
+      changes[r] = 0;
+      cvs[r] = 0;
+    }
+  });
+
+  // Calculate disparity alerts
+  let disparityAlerts = {};
+  regions.forEach(r => {
+    if (prices[r]) {
+      const otherPrices = regions.filter(o => o !== r).map(o => prices[o]).filter(p => p !== null && p > 0);
+      if (otherPrices.length > 0) {
+        const avgOthers = otherPrices.reduce((sum, val) => sum + val, 0) / otherPrices.length;
+        if (prices[r] > avgOthers * 1.15) {
+          disparityAlerts[r] = '🔴 Gangguan Distribusi';
+        } else if (prices[r] > avgOthers * 1.08) {
+          disparityAlerts[r] = '⚠️ Disparitas Tinggi';
+        }
+      }
+    }
+  });
+
+  let disparityHtml = `
+    <h3 style="font-size: 15px; font-weight: 700; margin: 0 0 16px 0; display: flex; align-items: center; justify-content: space-between; color: #f1f5f9; border-bottom: 1px solid rgba(255,255,255,0.06); padding-bottom: 10px;">
+      <span>📊 Perbandingan Harga Antar Daerah</span>
+      <span style="font-size: 11px; font-weight: normal; background: rgba(255,255,255,0.06); padding: 3px 8px; border-radius: 12px; color: #94a3b8;">Tren MoM</span>
+    </h3>
+    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; flex: 1;">
+  `;
+
+  regions.forEach(r => {
+    const priceVal = prices[r];
+    const pctChange = changes[r];
+    const cvVal = cvs[r];
+    const alertText = disparityAlerts[r];
+    
+    // Highlight if selected in the navbar
+    const isSelectedRegion = (r === selectedRegion);
+    const borderStyle = isSelectedRegion 
+      ? 'border: 2px solid #eab308; box-shadow: 0 0 12px rgba(234, 179, 8, 0.15);' 
+      : 'border: 1px solid rgba(255,255,255,0.06);';
+    
+    const changeText = pctChange >= 0 ? `▲ +${pctChange.toFixed(1)}%` : `▼ ${pctChange.toFixed(1)}%`;
+    const changeColor = pctChange > 5 ? '#ef4444' : (pctChange < -5 ? '#10b981' : '#cbd5e1');
+    
+    disparityHtml += `
+      <div style="background: rgba(30, 41, 59, 0.3); border-radius: 8px; padding: 16px 10px; display: flex; flex-direction: column; justify-content: space-between; min-height: 180px; position: relative; transition: all 0.2s; ${borderStyle}">
+        ${isSelectedRegion ? `<span style="position: absolute; top: -8px; left: 50%; transform: translateX(-50%); font-size: 8px; font-weight: bold; background: #eab308; color: #0f172a; padding: 1px 6px; border-radius: 8px; text-transform: uppercase; z-index: 10;">Daerah Aktif</span>` : ''}
+        <div>
+          <div style="font-size: 11px; color: #94a3b8; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; text-align: center; margin-bottom: 8px;">📍 ${r}</div>
+          <div style="font-size: 16px; font-weight: 700; color: #f8fafc; font-family: 'JetBrains Mono', monospace; text-align: center; margin-top: 4px;">
+            ${priceVal ? formatPrice(priceVal) : '<span style="color: #64748b; font-size: 11px; font-weight: normal;">Tidak ada data</span>'}
+          </div>
+        </div>
+        <div style="text-align: center; margin-top: 12px; display: flex; flex-direction: column; gap: 4px; align-items: center;">
+          <span style="font-size: 13px; font-weight: 700; color: ${changeColor};">${priceVal ? changeText : '-'}</span>
+          <span style="font-size: 9px; color: #64748b;">CV: ${priceVal ? cvVal + '%' : '-'}</span>
+        </div>
+        ${alertText ? `
+          <div style="margin-top: 10px; font-size: 9px; font-weight: bold; background: ${alertText.includes('Gangguan') ? 'rgba(239, 68, 68, 0.15)' : 'rgba(245, 158, 11, 0.15)'}; color: ${alertText.includes('Gangguan') ? '#ef4444' : '#f59e0b'}; padding: 3px 4px; border-radius: 4px; text-align: center; border: 1px solid ${alertText.includes('Gangguan') ? 'rgba(239, 68, 68, 0.2)' : 'rgba(245, 158, 11, 0.2)'};">
+             ${alertText}
+          </div>
+        ` : ''}
+      </div>
+    `;
+  });
+
+  disparityHtml += `
+    </div>
+    <div style="margin-top: 12px; font-size: 10px; color: #64748b; text-align: center; font-style: italic; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 8px; margin-bottom: 0;">
+      *Disparitas dihitung berdasarkan perbandingan deviasi harga antar daerah secara otomatis.
+    </div>
+  `;
+  
+  const dispEl = document.getElementById('card-regional-disparity');
+  if (dispEl) dispEl.innerHTML = disparityHtml;
+
+
+  // 2. B. Price Source Margin Analysis (Markup Chain Flow)
+  const sourceData = DATA.priceBySource[commodity] || {};
+  const prodPrice = sourceData['Produsen'] ? sourceData['Produsen'].latestPrice : null;
+  const bigPrice = sourceData['Pedagang Besar'] ? sourceData['Pedagang Besar'].latestPrice : null;
+  const tradPrice = sourceData['Pasar Tradisional'] ? sourceData['Pasar Tradisional'].latestPrice : null;
+
+  const hasProd = prodPrice !== null && prodPrice > 0;
+  const hasBig = bigPrice !== null && bigPrice > 0;
+  const hasTrad = tradPrice !== null && tradPrice > 0;
+
+  let marginHtml = `
+    <h3 style="font-size: 15px; font-weight: 700; margin: 0 0 16px 0; color: #f1f5f9; border-bottom: 1px solid rgba(255,255,255,0.06); padding-bottom: 10px;">
+      <span>⛓️ Margin Rantai Pasok & Markup Flow</span>
+    </h3>
+    <div style="display: flex; flex-direction: column; justify-content: space-between; flex: 1; gap: 16px;">
+      
+      <!-- Visual Chain Flow -->
+      <div style="display: flex; align-items: center; justify-content: space-between; background: rgba(30, 41, 59, 0.2); border: 1px solid rgba(255,255,255,0.04); border-radius: 12px; padding: 20px 10px; position: relative;">
+  `;
+  
+  // Node 1: Produsen
+  marginHtml += `
+    <div style="text-align: center; flex: 1;">
+      <div style="font-size: 9px; color: #94a3b8; font-weight: 700; text-transform: uppercase;">🌾 Produsen</div>
+      <div style="font-size: 13px; font-weight: 700; color: ${hasProd ? '#10b981' : '#64748b'}; font-family: 'JetBrains Mono', monospace; margin-top: 4px;">
+        ${hasProd ? formatPrice(prodPrice) : 'Tidak ada data'}
+      </div>
+    </div>
+  `;
+  
+  // Connector 1
+  if (hasProd && hasBig) {
+    const m1 = ((bigPrice - prodPrice) / prodPrice * 100).toFixed(1);
+    marginHtml += `
+      <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; flex: 0.8; position: relative;">
+        <span style="font-size: 9px; font-weight: 700; background: rgba(59, 130, 246, 0.15); color: #3b82f6; border: 1px solid rgba(59, 130, 246, 0.2); padding: 1px 5px; border-radius: 8px; z-index: 2;">+${m1}%</span>
+        <div style="width: 100%; height: 2px; background: linear-gradient(to right, #10b981, #14b8a6); position: absolute; top: 50%; transform: translateY(-50%); z-index: 1;"></div>
+      </div>
+    `;
+  } else {
+    marginHtml += `
+      <div style="display: flex; align-items: center; justify-content: center; flex: 0.8; position: relative;">
+        <div style="width: 100%; height: 2px; background: rgba(255,255,255,0.05); border-style: dashed; border-width: 1px;"></div>
+      </div>
+    `;
+  }
+  
+  // Node 2: Pedagang Besar
+  marginHtml += `
+    <div style="text-align: center; flex: 1;">
+      <div style="font-size: 9px; color: #94a3b8; font-weight: 700; text-transform: uppercase;">🏢 P. Besar</div>
+      <div style="font-size: 13px; font-weight: 700; color: ${hasBig ? '#14b8a6' : '#64748b'}; font-family: 'JetBrains Mono', monospace; margin-top: 4px;">
+        ${hasBig ? formatPrice(bigPrice) : 'Tidak ada data'}
+      </div>
+    </div>
+  `;
+  
+  // Connector 2
+  if (hasBig && hasTrad) {
+    const m2 = ((tradPrice - bigPrice) / bigPrice * 100).toFixed(1);
+    marginHtml += `
+      <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; flex: 0.8; position: relative;">
+        <span style="font-size: 9px; font-weight: 700; background: rgba(245, 158, 11, 0.15); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.2); padding: 1px 5px; border-radius: 8px; z-index: 2;">+${m2}%</span>
+        <div style="width: 100%; height: 2px; background: linear-gradient(to right, #14b8a6, #f59e0b); position: absolute; top: 50%; transform: translateY(-50%); z-index: 1;"></div>
+      </div>
+    `;
+  } else {
+    marginHtml += `
+      <div style="display: flex; align-items: center; justify-content: center; flex: 0.8; position: relative;">
+        <div style="width: 100%; height: 2px; background: rgba(255,255,255,0.05); border-style: dashed; border-width: 1px;"></div>
+      </div>
+    `;
+  }
+  
+  // Node 3: Pasar Tradisional
+  marginHtml += `
+    <div style="text-align: center; flex: 1;">
+      <div style="font-size: 9px; color: #94a3b8; font-weight: 700; text-transform: uppercase;">🧺 P. Tradisional</div>
+      <div style="font-size: 13px; font-weight: 700; color: ${hasTrad ? '#f59e0b' : '#64748b'}; font-family: 'JetBrains Mono', monospace; margin-top: 4px;">
+        ${hasTrad ? formatPrice(tradPrice) : 'Tidak ada data'}
+      </div>
+    </div>
+  `;
+  
+  marginHtml += `
+      </div>
+  `;
+  
+  // Summary Card (Total Margin)
+  if (hasProd && hasTrad) {
+    const totalM = ((tradPrice - prodPrice) / prodPrice * 100).toFixed(1);
+    marginHtml += `
+      <div style="background: linear-gradient(135deg, rgba(244, 63, 94, 0.08) 0%, rgba(15, 23, 42, 0.4) 100%); border: 1px solid rgba(244, 63, 94, 0.2); border-radius: 8px; padding: 12px; display: flex; align-items: center; justify-content: space-between;">
+        <div style="text-align: left;">
+          <span style="font-size: 11px; color: #f43f5e; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; display: block;">Total Margin Rantai Pasok</span>
+          <span style="font-size: 9px; color: #64748b; margin-top: 2px; display: block;">Selisih harga tingkat konsumen vs petani</span>
+        </div>
+        <span style="font-size: 18px; font-weight: 800; color: #f43f5e; text-shadow: 0 0 10px rgba(244, 63, 94, 0.2);">+${totalM}%</span>
+      </div>
+    `;
+  } else {
+    marginHtml += `
+      <div style="background: rgba(255, 255, 255, 0.02); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 8px; padding: 12px; text-align: center; display: flex; flex-direction: column; gap: 4px; justify-content: center;">
+        <span style="font-size: 11px; color: #94a3b8; font-weight: 600; text-transform: uppercase;">Margin Total Tidak Tersedia</span>
+        <span style="font-size: 9px; color: #64748b;">Kalkulasi lengkap memerlukan data Produsen & Pasar Tradisional.</span>
+      </div>
+    `;
+  }
+  
+  marginHtml += `
+    </div>
+  `;
+  
+  const margEl = document.getElementById('card-margin-analysis');
+  if (margEl) margEl.innerHTML = marginHtml;
 }
 
 // ── Price Trend Chart ────────────────────────────────────────────
@@ -551,8 +897,31 @@ function toggleForecast() {
 }
 
 function updatePriceTrendChart(singleCommodity = null) {
-  const ts = DATA.timeseries;
-  const forecasts = DATA.forecasts || {};
+  // Reconstruct timeseries and forecast references for regional support (Tier 2 regional forecasts)
+  let ts = DATA.timeseries;
+  let forecasts = DATA.forecasts || {};
+  
+  if (selectedRegion && selectedRegion !== 'aggregated') {
+    ts = {};
+    for (const [commodity, regDict] of Object.entries(DATA.regional)) {
+      if (regDict[selectedRegion]) {
+        ts[commodity] = {
+          shortName: DATA.commodityCards.find(c => c.commodity === commodity)?.shortName || commodity,
+          category: DATA.commodityCards.find(c => c.commodity === commodity)?.category || '',
+          dates: regDict[selectedRegion].dates,
+          prices: regDict[selectedRegion].prices
+        };
+      }
+    }
+    
+    forecasts = {};
+    for (const [commodity, regFcDict] of Object.entries(DATA.regionalForecasts)) {
+      if (regFcDict[selectedRegion]) {
+        forecasts[commodity] = regFcDict[selectedRegion];
+      }
+    }
+  }
+
   const datasets = [];
 
   for (const [commodity, data] of Object.entries(ts)) {
@@ -664,16 +1033,16 @@ function renderYoYChart() {
       labels,
       datasets: [
         {
-          label: '2023 → 2024',
-          data: yoy.map(y => y.change_23_24),
+          label: '2024 → 2025',
+          data: yoy.map(y => y.change_24_25),
           backgroundColor: 'rgba(59, 130, 246, 0.7)',
           borderColor: 'rgba(59, 130, 246, 1)',
           borderWidth: 1,
           borderRadius: 4,
         },
         {
-          label: '2024 → 2025',
-          data: yoy.map(y => y.change_24_25),
+          label: '2025 → 2026',
+          data: yoy.map(y => y.change_25_26),
           backgroundColor: 'rgba(239, 68, 68, 0.7)',
           borderColor: 'rgba(239, 68, 68, 1)',
           borderWidth: 1,
@@ -785,8 +1154,9 @@ function renderVolatilityHeatmap() {
   const vol = DATA.volatility;
   const commodities = Object.keys(vol);
 
-  // Sort by 2025 CV descending
-  commodities.sort((a, b) => (vol[b]['2025'] || 0) - (vol[a]['2025'] || 0));
+  // Sort by latest CV descending
+  const maxYear = Object.keys(vol[commodities[0]] || {}).filter(k => !isNaN(k)).sort().reverse()[0] || '2025';
+  commodities.sort((a, b) => (vol[b][maxYear] || 0) - (vol[a][maxYear] || 0));
 
   function cvColor(cv) {
     if (cv > 20) return { bg: 'rgba(239, 68, 68, 0.6)', text: '#fff' };
@@ -800,7 +1170,8 @@ function renderVolatilityHeatmap() {
   // Header row
   html += '<div class="heatmap-row">';
   html += '<div class="heatmap-label"></div>';
-  ['2023', '2024', '2025'].forEach(y => {
+  const years = Object.keys(vol[commodities[0]] || {}).filter(k => !isNaN(k)).sort();
+  years.forEach(y => {
     html += `<div class="heatmap-cell heatmap-header">${y}</div>`;
   });
   html += '</div>';
@@ -809,8 +1180,8 @@ function renderVolatilityHeatmap() {
     const d = vol[commodity];
     html += '<div class="heatmap-row">';
     html += `<div class="heatmap-label" title="${commodity}">${d.shortName}</div>`;
-    ['2023', '2024', '2025'].forEach(y => {
-      const v = d[y];
+    years.forEach(y => {
+      const v = d[y] || 0;
       const c = cvColor(v);
       html += `<div class="heatmap-cell" style="background:${c.bg};color:${c.text};min-width:80px"
                title="${commodity} ${y}: CV=${v}%">${v}%</div>`;
