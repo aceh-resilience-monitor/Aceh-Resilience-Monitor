@@ -276,9 +276,11 @@ describe('readJsonFile & writeJsonFile — File I/O Operations', () => {
     });
 
     test('readJsonFile should return empty array for corrupted JSON', () => {
+        const spy = jest.spyOn(console, 'error').mockImplementation(() => {});
         fs.writeFileSync(TEST_FILE, '{ this is not valid JSON !!!', 'utf8');
         const result = readJsonFile(TEST_FILE);
         expect(result).toEqual([]);
+        spy.mockRestore();
     });
 
     test('writeJsonFile should pretty-print with 2-space indentation', () => {
