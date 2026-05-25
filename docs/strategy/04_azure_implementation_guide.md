@@ -13,7 +13,7 @@ Laptop Kamu
 ├── Excel (2023-2025.xlsx)
 ├── Python script (prepare_dashboard_data.py)
 │   ├── ETL + cleaning
-│   ├── Prophet training (18 model)
+│   ├── Prophet training (21 komoditas, 84 model)
 │   ├── Z-Score anomaly detection
 │   └── Output: dashboard_data.json
 ├── Dashboard (HTML/CSS/JS)
@@ -39,38 +39,38 @@ Laptop Kamu
 graph TD
     A["🌐 PIHPS Website\n(bi.go.id/hargapangan)\nData harga harian"] 
     
-    B["⚡ Azure Functions\n(Timer: setiap hari 08:00 WIB)\nScrape data terbaru"]
+    B["⚡ Azure Functions\n(Timer: setiap hari 08:00 WIB)\nETL + ML Retrain + Inference"]
     
-    C["📦 Azure Blob Storage\n(Data Lake)\nSimpan: raw data + results"]
+    C["📦 Azure Blob Storage\n(Data Lake)\nraw/ + processed/ + models/"]
     
-    D["🧠 Azure Machine Learning\n(MLflow Tracking)\nTrain model + log metrics"]
+    D["🧠 Azure Machine Learning\n(MLflow Tracking API)\nLog production metrics harian"]
     
-    E["📊 dashboard_data.json\n(di Blob Storage)\nOutput pipeline"]
+    E["📊 dashboard_data.json\n(di Blob Storage publik)\nOutput pipeline terkompresi (~1.2MB)"]
     
-    F["📱 Azure Static Web Apps\n(Dashboard ARM)\nFetch JSON → tampilkan"]
+    F["📱 Azure Static Web Apps\n(Dashboard ARM)\nFetch JSON → tampilkan (<1.5 detik)"]
     
-    G["📲 Telegram Bot\nKirim alert jika anomali"]
+    G["📲 Telegram Bot\nKirim alert (Z-Score + EWS)"]
 
-    A -->|"1. Fetch harga hari ini"| B
-    B -->|"2. Simpan data baru"| C
-    C -->|"3. Training & evaluation"| D
-    D -->|"4. Model terbaik + prediksi"| C
-    B -->|"5. Generate dashboard JSON"| E
-    E -->|"6. Dashboard auto-update"| F
-    B -->|"7. Jika anomali → alert"| G
+    A -->|"1. Scrape harian"| B
+    B -->|"2. Simpan & gabungkan JSON tahunan"| C
+    B -->|"3. Train model on-the-fly & forecast"| B
+    B -->|"4. Log metrik harian via MLflow"| D
+    B -->|"5. Generate & unggah feed terkompresi"| E
+    E -->|"6. Dashboard loading cepat"| F
+    B -->|"7. Jika anomali/EWS spike → kirim alert"| G
 ```
 
 ### Penjelasan Sederhana per Langkah
 
 | Step | Apa yang Terjadi | Siapa yang Menjalankan |
 |:---:|---|---|
-| 1 | Ambil harga 18 komoditas hari ini dari website PIHPS | Azure Functions (otomatis) |
-| 2 | Simpan data baru ke "gudang data" di cloud | Azure Functions → Blob Storage |
-| 3 | Train ulang model Prophet + log semua metrik (MAPE, MAE, dll) | Azure ML + MLflow |
-| 4 | Simpan model terbaik + hasil prediksi 90 hari | Azure ML → Blob Storage |
-| 5 | Generate `dashboard_data.json` yang baru (dengan data terbaru) | Azure Functions |
-| 6 | Dashboard otomatis menampilkan data terbaru saat dibuka | Static Web Apps ← Blob Storage |
-| 7 | Jika harga hari ini anomali (Z-Score > 2σ), kirim notifikasi | Azure Functions → Telegram |
+| 1 | Ambil harga 21 komoditas hari ini dari website PIHPS | Azure Functions (otomatis) |
+| 2 | Simpan data baru harian ke file tahun berjalan (`2026.json`) di Blob Storage | Azure Functions → Blob Storage |
+| 3 | Jalankan ETL (musim Meugang) & latih ulang Prophet secara on-the-fly | Azure Functions (di RAM) |
+| 4 | Kirim log metrik harian (MAPE, MAE) ke cloud untuk memantau drift | Azure Functions → Azure ML (via MLflow) |
+| 5 | Generate `dashboard_data.json` terkompresi (Weekly resampling & 90-day windowing) | Azure Functions → Blob Storage |
+| 6 | Dashboard otomatis menampilkan data terbaru secara instan (<1.5 detik) | Static Web Apps ← Blob Storage |
+| 7 | Jika anomali hari ini (Z-Score > 2σ) atau EWS spike (>20% ke depan) terjadi, kirim alert | Azure Functions → Telegram Bot |
 
 ---
 
@@ -80,7 +80,7 @@ graph TD
 
 > Azure ML = **"Lab eksperimen"** di cloud. Setiap kali kamu train model, semua dicatat: parameter apa yang dipakai, metrik hasilnya berapa, model file-nya disimpan di mana.
 
-**Kenapa perlu?** Karena saat ini kamu train 18 model Prophet di laptop dan TIDAK ADA catatan formal. Juri tidak bisa melihat proses eksperimen kamu.
+**Kenapa perlu?** Karena saat ini kamu train 21 komoditas (84 model Prophet per daerah) di laptop dan TIDAK ADA catatan formal. Juri tidak bisa melihat proses eksperimen kamu.
 
 ### Apa yang Akan Kamu Lakukan di Azure ML?
 
@@ -97,7 +97,7 @@ graph TD
 │  │   ├── Params: yearly_seasonality=True    │
 │  │   ├── Metrics: MAPE=29.54%, MAE=22855   │
 │  │   └── Artifact: model_cabai_merah.pkl    │
-│  └── ... (18 runs, 1 per komoditas)         │
+│  └── ... (84 runs, per komoditas & daerah)  │
 │                                             │
 │  Experiment: "arm-automl-comparison"        │
 │  ├── AutoML run (otomatis coba 15+ model)   │
@@ -193,7 +193,7 @@ python scripts/train_with_mlflow.py
 1. Buka ml.azure.com
 2. Pilih workspace arm-ml-workspace
 3. Klik Experiments → arm-prophet-forecasting
-4. Lihat semua 18 runs dengan metrics, params, artifacts
+4. Lihat semua 21/84 runs dengan metrics, params, artifacts
 5. Screenshot ini untuk presentasi! 📸
 ```
 
@@ -244,7 +244,9 @@ func init --python --model V2
 import azure.functions as func
 import logging
 import json
+import os
 import requests
+import pandas as pd
 from datetime import datetime
 
 app = func.FunctionApp()
@@ -256,29 +258,41 @@ app = func.FunctionApp()
 def daily_pipeline(myTimer: func.TimerRequest) -> None:
     logging.info("🚀 ARM Daily Pipeline started")
     
-    # Step 1: Scrape data terbaru dari PIHPS
+    # Step 1: Scrape data terbaru dari PIHPS harian
     new_data = scrape_pihps_today()
     logging.info(f"Scraped {len(new_data)} commodity prices")
     
-    # Step 2: Load data historis dari Blob Storage
-    historical = load_from_blob("arm-data", "historical_data.json")
+    # Step 2: Load data historis (Opsi A - JSON tahunan digabung di RAM)
+    historical_df = load_and_combine_blob_historical()
     
-    # Step 3: Append data baru
-    historical.extend(new_data)
-    save_to_blob("arm-data", "historical_data.json", historical)
+    # Step 3: Append data baru harian ke file tahun berjalan (2026.json) di Blob Storage
+    append_today_to_current_year_blob(new_data)
     
-    # Step 4: Run anomaly detection
-    anomalies_today = detect_anomalies(new_data, historical)
+    # Gabungkan data baru ke df historis di memori
+    new_df = pd.DataFrame(new_data)
+    combined_df = pd.concat([historical_df, new_df], ignore_index=True)
     
-    # Step 5: Update dashboard JSON
-    dashboard_data = generate_dashboard_json(historical, anomalies_today)
-    save_to_blob("arm-data", "dashboard_data.json", dashboard_data)
+    # Step 4: Jalankan ETL add_holiday_features() (Kearifan Lokal Meugang) secara dinamis di RAM
+    df_enriched = add_holiday_features(combined_df)
     
-    # Step 6: Send notification if critical anomaly
-    critical = [a for a in anomalies_today if a['severity'] == 'critical']
-    if critical:
-        send_telegram_alert(critical)
-        logging.warning(f"🚨 {len(critical)} critical anomalies detected!")
+    # Step 5: Run Z-Score Anomaly Detection (Reaktif)
+    anomalies_today = detect_anomalies(new_data, combined_df)
+    
+    # Step 6: Run Prophet Forecasting (Hibrida: Train harian secara on-the-fly di RAM)
+    forecast_results = forecast_all_commodities(df_enriched)
+    
+    # Step 7: Run Prophet EWS (Proaktif: Deteksi lonjakan masa depan >20%)
+    future_spikes = detect_future_spikes(forecast_results)
+    
+    # Step 8: Update dashboard_data.json (Weekly resampling & 90-day windowing untuk LCP)
+    dashboard_data = generate_dashboard_json(combined_df, anomalies_today, forecast_results)
+    save_to_blob("arm-public-data", "dashboard_data.json", dashboard_data)
+    
+    # Step 9: Send Telegram alerts (Z-Score + Prophet EWS)
+    send_telegram_alert(anomalies_today, future_spikes)
+    
+    # Step 10: Log Production Metrics harian ke Azure ML Studio via MLflow API
+    log_production_metrics_to_mlflow(forecast_results)
     
     logging.info("✅ ARM Daily Pipeline completed")
 
@@ -287,7 +301,7 @@ def scrape_pihps_today():
     """Fetch latest prices from PIHPS API."""
     commodities = [
         "Beras Kualitas Bawah I", "Cabai Merah Keriting",
-        # ... semua 18 komoditas
+        # ... semua 21 komoditas
     ]
     results = []
     for com in commodities:
@@ -408,7 +422,7 @@ datathon-dicoding/
 |---|---|---|
 | **GitHub Repo** | github.com/aceh-resilience-monitor/... | Kode lengkap + dokumentasi |
 | **Live Dashboard** | thankful-river-....azurestaticapps.net | Auto-update via pipeline |
-| **Azure ML Studio** | ml.azure.com (screenshot di docs) | 18 experiments + metrics |
+| **Azure ML Studio** | ml.azure.com (screenshot di docs) | 21/84 experiments + metrics |
 | **Azure Functions** | Portal (screenshot di docs) | Daily pipeline running |
 | **Telegram Bot** | Live demo di presentasi | Real-time alerts |
 
@@ -438,7 +452,7 @@ config.json          # Azure ML credentials
 |---|---|---|---|
 | **1** | Setup Azure ML Workspace + install SDK | Aulia | 2 jam |
 | **2** | Refactor scripts → modular (config, etl, anomaly, forecast) | Ilhaam | 4 jam |
-| **3** | Buat `train_with_mlflow.py` + jalankan 18 experiments | Aulia | 4 jam |
+| **3** | Buat `train_with_mlflow.py` + jalankan 21/84 experiments | Aulia | 4 jam |
 | **4** | Setup Azure Functions project + scraper PIHPS | Aulia | 4 jam |
 | **5** | Setup Telegram Bot + notification logic | Arief | 3 jam |
 | **6** | Deploy Azure Functions + testing end-to-end | Aulia + Ilhaam | 4 jam |

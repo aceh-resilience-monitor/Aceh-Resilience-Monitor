@@ -4,6 +4,37 @@ Semua 13 plot tersimpan di folder `plots/`. Berikut interpretasi lengkap tiap vi
 
 ---
 
+## 🧪 Hipotesis Penelitian & Validasi Empiris
+
+Sebelum melakukan analisis mendalam, kami merumuskan 4 hipotesis kunci mengenai perilaku harga bahan pangan pokok di Aceh. Hipotesis-hipotesis ini divalidasi secara empiris menggunakan visualisasi data yang dihasilkan:
+
+### 1. Hipotesis Volatilitas Hortikultura (Cabai & Bawang)
+*   **Pernyataan Hipotesis:** Kelompok komoditas hortikultura (khususnya Cabai Merah Keriting, Cabai Rawit Hijau, dan Bawang Merah) memiliki tingkat volatilitas harga harian dan tahunan tertinggi dibandingkan kelompok komoditas lainnya karena kerentanan tinggi terhadap faktor cuaca (musim) dan rantai pasok yang panjang.
+*   **Validasi Empiris:** 
+    *   **[Plot 7 (CV Heatmap)](file:///Users/auliamuzhaffar/Documents/Datathon/datathon-dicoding/plots/07_cv_heatmap.png):** Menunjukkan Coefficient of Variation (CV) Cabai Merah Keriting adalah yang tertinggi dan terus meningkat dari tahun ke tahun (**25.9%** di 2023, **31.6%** di 2024, hingga **35.5%** di 2025).
+    *   **[Plot 2 (Violin Plots)](file:///Users/auliamuzhaffar/Documents/Datathon/datathon-dicoding/plots/02_violin_volatile.png):** Memperlihatkan rentang bentuk violin Cabai Merah Keriting yang sangat lebar ke atas di tahun 2025 (>140K) dan berbentuk bimodal (dua puncak).
+    *   **[Plot 11 (Daily Returns)](file:///Users/auliamuzhaffar/Documents/Datathon/datathon-dicoding/plots/11_daily_returns.png):** Standar deviasi return harian ($\sigma$) Cabai Merah Keriting (**8.06%**) dan Cabai Rawit Hijau (**5.98%**) jauh lebih besar dibandingkan komoditas stabil seperti Daging Sapi ($\sigma \approx 0.5\%$).
+
+### 2. Hipotesis Tradisi Keagamaan / "Meugang" Aceh (Daging Sapi)
+*   **Pernyataan Hipotesis:** Komoditas Daging Sapi Kualitas 1 di Aceh memiliki harga yang sangat stabil di sepanjang tahun, namun mengalami lonjakan harga yang sangat ekstrem dan presisi pada H-1/H-2 Ramadan dan Idul Fitri akibat tingginya permintaan kultural untuk tradisi *Meugang*.
+*   **Validasi Empiris:**
+    *   **[Plot 10 (Z-Score Heatmap)](file:///Users/auliamuzhaffar/Documents/Datathon/datathon-dicoding/plots/10_zscore_heatmap.png):** Menunjukkan lonjakan Z-score harga bulanan Daging Sapi yang masif **hanya terjadi pada bulan Maret** (Z = **+2.82**), yang bertepatan dengan momentum menyambut Ramadan dan lebaran selama rentang tahun 2023–2025. Di luar bulan tersebut, Z-score mendekati 0 atau negatif.
+    *   **[Plot 7 (CV Heatmap)](file:///Users/auliamuzhaffar/Documents/Datathon/datathon-dicoding/plots/07_cv_heatmap.png):** Membuktikan stabilitas harga ekstrim di luar hari raya, dengan nilai CV tahunan daging sapi yang sangat rendah (rata-rata **< 2%**).
+
+### 3. Hipotesis Pergeseran Rezim Harga Beras (*Regime Change*)
+*   **Pernyataan Hipotesis:** Kenaikan harga beras pada awal tahun 2024 tidak bersifat fluktuasi musiman sementara (*temporary spike*), melainkan merupakan lompatan pergeseran tingkat harga permanen (*regime change* / *step-function jump*) ke level dasar baru yang lebih tinggi.
+*   **Validasi Empiris:**
+    *   **[Plot 3 (Time Series Kategori Beras)](file:///Users/auliamuzhaffar/Documents/Datathon/datathon-dicoding/plots/03_timeseries_all.png):** Menampilkan pergerakan harga keenam varietas beras yang melonjak serentak secara vertikal di awal 2024 dan menetap secara horizontal tanpa pernah turun kembali ke level harga 2023.
+    *   **[Plot 13 (Stacked Area Chart)](file:///Users/auliamuzhaffar/Documents/Datathon/datathon-dicoding/plots/13_stacked_area.png):** Visualisasi kumulatif menunjukkan kontribusi area Beras (biru gelap) menebal secara permanen semenjak Q1 2024, mengindikasikan peningkatan proporsi pengeluaran bahan pokok pangan secara menetap.
+
+### 4. Hipotesis Akhir Tahun / "Nataru" (Protein Ungas)
+*   **Pernyataan Hipotesis:** Komoditas protein hewani asal unggas (Daging Ayam Ras dan Telur Ayam Ras) mengalami lonjakan harga musiman yang konsisten setiap bulan Desember akibat peningkatan konsumsi rumah tangga menjelang libur Natal dan Tahun Baru.
+*   **Validasi Empiris:**
+    *   **[Plot 9 (Pola Seasonality Bulanan)](file:///Users/auliamuzhaffar/Documents/Datathon/datathon-dicoding/plots/09_seasonality.png):** Menampilkan pola harga rata-rata bulanan Daging Ayam dan Telur Ayam yang selalu mencapai puncaknya di bulan Desember pada tahun 2023, 2024, dan 2025.
+    *   **[Plot 10 (Z-Score Heatmap)](file:///Users/auliamuzhaffar/Documents/Datathon/datathon-dicoding/plots/10_zscore_heatmap.png):** Mengonfirmasi pola musiman akhir tahun dengan Z-Score Telur Ayam sebesar **+2.84** di bulan Desember (Z-score tertinggi untuk komoditas tersebut), yang berarti harga di bulan Desember berada hampir 3 standar deviasi di atas rata-rata tahunannya.
+
+---
+
 ## Plot 1 — Box Plots: Distribusi Harga per Komoditas & Tahun
 ![Box Plots](../plots/01_boxplots.png)
 

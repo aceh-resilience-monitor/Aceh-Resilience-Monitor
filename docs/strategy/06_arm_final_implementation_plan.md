@@ -105,10 +105,11 @@ Buat 3 file test (ini juga memperkuat kontribusi Arief → G8):
 
 `tests/test_etl.py`:
 ```
-- test_load_and_clean_returns_correct_columns()
-- test_load_and_clean_drops_missing_prices()
-- test_category_map_covers_all_18_commodities()
-- test_add_features_creates_lag_columns()
+- test_returns_correct_columns()
+- test_filters_known_commodities()
+- test_has_21_commodities()
+- test_has_3_regions()
+- test_has_4_sources()
 ```
 
 `tests/test_anomaly.py`:
@@ -166,16 +167,16 @@ Tambah section di `evaluation_prophet.md`:
 
 | Gap | Deliverable | Owner | ☐ |
 |---|---|---|---|
-| G1 | Kode modular (config + etl + anomaly) | Ilhaam | ☐ |
-| G2 | Zero duplikasi lintas file | Ilhaam | ☐ |
-| G3 | Semua print → logging | Ilhaam | ☐ |
-| G4 | Unit tests (10+ test cases) | Arief | ☐ |
-| G5 | Threshold punya justifikasi statistik | Aulia | ☐ |
-| G6 | Klaim "real-time" diperbaiki | Aulia | ☐ |
-| G9 | Feature engineering (9 features) | Ilhaam | ☐ |
-| G10 | Hipotesis EDA formal | Arief | ☐ |
-| G11 | Baseline comparison (Naive, SMA, EMA vs Prophet) | Aulia | ☐ |
-| G21 | Data dictionary | Arief | ☐ |
+| G1 | Kode modular (config + etl + anomaly) | Ilhaam | ✅ |
+| G2 | Zero duplikasi lintas file | Ilhaam | ✅ |
+| G3 | Semua print → logging | Ilhaam | ✅ |
+| G4 | Unit tests (10+ test cases) | Arief | ✅ |
+| G5 | Threshold punya justifikasi statistik | Aulia | ✅ |
+| G6 | Klaim "real-time" diperbaiki | Aulia | ✅ |
+| G9 | Feature engineering (9 features) | Ilhaam | ✅ |
+| G10 | Hipotesis EDA formal | Arief | ✅ |
+| G11 | Baseline comparison (Naive, SMA, EMA vs Prophet) | Aulia | ✅ |
+| G21 | Data dictionary | Arief | ✅ |
 
 ---
 
@@ -200,9 +201,9 @@ Tambah section di `evaluation_prophet.md`:
 ```
 1. Buat scripts/train_with_mlflow.py
    - Connect ke Azure ML workspace
-   - Loop 18 komoditas
+   - Loop 21 komoditas (dan opsional per wilayah untuk total 84 runs)
    - Setiap run: log params + metrics + model artifact
-2. Jalankan → 18 experiments muncul di ml.azure.com
+2. Jalankan → 21/84 experiments muncul di ml.azure.com
 3. Screenshot MLflow experiments → docs/screenshots/mlflow_experiments.png
 4. Screenshot model comparison → docs/screenshots/mlflow_comparison.png
 ```
@@ -256,10 +257,13 @@ Model memberikan alert, manusia (TPID) membuat keputusan final.
 3. func init --python --model V2
 4. Buat function_app.py:
    - Timer trigger (daily 08:00 WIB)
-   - Scrape PIHPS (hit internal API)
-   - Anomaly detection pada data baru
-   - Update dashboard_data.json di Blob
-   - Kirim Telegram jika anomali
+   - Scrape PIHPS harian (append ke file 2026.json di Blob)
+   - ETL kearifan lokal Meugang dinamis di RAM
+   - Anomaly detection harian (Z-Score)
+   - Prophet training & forecasting on-the-fly di RAM
+   - Update dashboard_data.json terkompresi (Weekly resampling & 90-day windowing)
+   - Kirim Telegram alerts (Z-Score + Prophet EWS)
+   - Log production metrics harian ke Azure ML Studio via MLflow API
 5. Test lokal: func start → trigger manual
 ```
 
@@ -357,7 +361,7 @@ End-to-end test:
 
 | Gap | Deliverable | Owner | ☐ |
 |---|---|---|---|
-| G12 | Azure ML + 18 MLflow experiments | Aulia | ☐ |
+| G12 | Azure ML + 21/84 MLflow experiments | Aulia | ☐ |
 | G13 | Azure Functions deployed + daily trigger | Aulia | ☐ |
 | G14 | Azure architecture documented | Arief | ☐ |
 | G15 | Telegram bot active | Arief | ☐ |
@@ -434,7 +438,7 @@ Struktur 12 slides (asumsi 10-15 menit presentasi):
 ```
 Slide 1:  Cover — "Aceh Resilience Monitor"
 Slide 2:  Problem — Volatilitas harga, birokrasi reaktif (data + angka)
-Slide 3:  Data — 18 komoditas, 3 tahun, 14.000+ data points
+Slide 3:  Data — 21 komoditas, 3 daerah, 4 sumber, 6 tahun (2021-2026), 14.000+ data points
 Slide 4:  Methodology — CRISP-DM pipeline + diagram arsitektur
 Slide 5:  EDA Highlights — 3 insight paling mengejutkan (bukan semua 13)
 Slide 6:  Model — Prophet vs baselines + MAPE comparison table

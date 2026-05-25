@@ -14,7 +14,7 @@
 ### Ringkasan Eksekutif
 Volatilitas harga pangan strategis sering kali memicu lonjakan inflasi daerah. Dalam praktiknya, pengambilan keputusan oleh pemangku kebijakan sering terhambat oleh lambatnya integrasi data dan ketidakmampuan untuk memprediksi tren harga di masa depan berdasarkan data historis.
 
-**Problem Statement:** Bagaimana menyatukan aliran data historis harga 18 komoditas pangan strategis untuk mendeteksi anomali secara *real-time* dan memprediksi lonjakan harga di masa depan guna memberikan rekomendasi intervensi pasar yang proaktif?
+**Problem Statement:** Bagaimana menyatukan aliran data historis harga 21 komoditas pangan strategis untuk mendeteksi anomali secara harian otomatis dan memprediksi lonjakan harga di masa depan guna memberikan rekomendasi intervensi pasar yang proaktif?
 
 **Research Questions:** 
 1. Komoditas apa saja yang saat ini menunjukkan anomali harga tertinggi (kritis) di luar kewajaran pergerakan rata-rata (Moving Average)?
@@ -26,7 +26,7 @@ Proyek ini bertindak sebagai *painkiller*, bukan sekadar *vitamin*. Tanpa adanya
 
 ### Deskripsi Project
 **Nama Produk:** Aceh Resilience Monitor (ARM) - Dashboard Intelijen Harga Pangan  
-**Fungsi:** Platform analitik *web-based* interaktif untuk mendeteksi anomali harga masa lalu dan memprediksi pergerakan harga 18 komoditas sembako esensial di Aceh hingga 3 bulan ke depan.  
+**Fungsi:** Platform analitik *web-based* interaktif untuk mendeteksi anomali harga masa lalu dan memprediksi pergerakan harga 21 komoditas sembako esensial di Aceh hingga 3 bulan ke depan.  
 **Penyelesaian Masalah:** ARM menyelesaikan masalah "keterlambatan respon" pemerintah. Alih-alih menyajikan tabel data yang rumit, ARM memberikan *Early Warning System* langsung berupa peringatan status "EKSTREM" atau "WASPADA", lengkap dengan rekomendasi tindakan preventif harian (misal: penyiapan kuota distribusi cadangan).
 
 ---

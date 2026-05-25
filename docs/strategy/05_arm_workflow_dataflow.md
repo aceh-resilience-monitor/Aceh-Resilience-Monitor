@@ -9,8 +9,9 @@
 ```mermaid
 graph TB
     subgraph "📥 DATA SOURCE"
-        A["🌐 PIHPS BI\n(bi.go.id/hargapangan)\nHarga harian 18 komoditas"]
-        B["📄 Historical Excel\n2023.xlsx / 2024.xlsx / 2025.xlsx"]
+        A["🌐 PIHPS BI API\n(bi.go.id/hargapangan)\nHarga harian 21 komoditas"]
+        B["📦 Dataup JSON Lake\n2021.json - 2026.json (Clean & Granular)"]
+        B_Legacy["📄 Legacy Excel\n2023.xlsx - 2025.xlsx (aggregated)"]
     end
 
     subgraph "☁️ AZURE CLOUD PLATFORM"
@@ -30,18 +31,23 @@ graph TB
 
     subgraph "📲 OUTPUT"
         G["📊 Dashboard ARM\nInteractive Web App"]
-        H["📱 Telegram Bot\nReal-time Alerts"]
+        H["📱 Telegram Bot\nReal-time & EWS Alerts"]
     end
 
-    A -->|"Scrape daily"| C
-    B -->|"Initial load"| E
+    subgraph "🔬 OFFLINE VALIDATION"
+        Val["Baseline Comparison\nNaive vs SMA vs Prophet"]
+    end
+
+    A -->|"Scrape daily append"| C
+    B -->|"Initial load (2021-2026)"| E
+    B_Legacy -.->|"Offline comparison & QA"| Val
     C -->|"Fetch + process"| E
-    E -->|"Training data"| D
+    E -->|"Training data (multi-dim)"| D
     D -->|"Model + predictions"| E
     C -->|"Generate JSON"| E
     E -->|"dashboard_data.json"| F
     F --> G
-    C -->|"If anomaly"| H
+    C -->|"If anomaly / EWS spike"| H
 ```
 
 ---
@@ -51,35 +57,38 @@ graph TB
 ```mermaid
 flowchart LR
     subgraph "LAYER 1: Data Ingestion"
-        A1["Excel 2023-2025\n(format kotor)"]
-        A2["PIHPS API\n(daily scrape)"]
+        A1["dataup JSON (2021-2026)\n(clean & granular)"]
+        A2["PIHPS API\n(daily scrape JSON)"]
+        A3_Legacy["Legacy Excel 2023-2025\n(aggregated / kotor)"]
     end
 
     subgraph "LAYER 2: ETL Pipeline"
-        B1["load_and_clean()\nParsing tanggal\nHapus header romawi\nString → numeric"]
-        B2["add_features()\nlag_1d, lag_7d, lag_30d\nrolling_mean, rolling_std\nmomentum, seasonality flags"]
+        B1["load_from_dataup_json()\nMulti-dimensional parsing\ndaerah & sumber mappings"]
+        B2["add_features()\nlag_1d, lag_7d, lag_30d\nrolling_mean, rolling_std\nmomentum, holiday flags"]
+        B1_Legacy["load_from_excel()\nValidation baseline parser"]
     end
 
     subgraph "LAYER 3: Analytics"
         C1["Z-Score Anomaly\nMA30 + 2σ threshold\nSeverity classification"]
-        C2["Prophet Forecasting\n18 models × 90 hari\nyhat + confidence interval"]
+        C2["Prophet Forecasting\n84 models × 90 hari\n(21 commodities × 4 regions)"]
         C3["Statistical Analysis\nCV%, YoY change\nCorrelation matrix\nSeasonality Z-Score"]
     end
 
     subgraph "LAYER 4: Intelligence"
-        D1["EWS Logic\nTop 3 komoditas kritis\nSpike > 15% detection"]
+        D1["EWS & Anomaly Logic\nTop 3 komoditas kritis\nSpike > 15% detection"]
         D2["Alert Generation\nCritical / Warning\n+ Rekomendasi aksi"]
-        D3["Executive Summary\nAzure OpenAI\nor data-driven fallback"]
+        D3["Executive Summary\nData-driven fallback\n(replaces OpenAI)"]
     end
 
     subgraph "LAYER 5: Output"
         E1["dashboard_data.json\n→ Azure Blob Storage"]
         E2["MLflow Metrics\n→ Azure ML Studio"]
-        E3["Telegram Alert\n→ Satgas Pangan"]
+        E3["Telegram Alert\n→ Satgas Pangan (Z-Score + EWS)"]
     end
 
     A1 --> B1
     A2 --> B1
+    A3_Legacy -.-> B1_Legacy
     B1 --> B2
     B2 --> C1
     B2 --> C2
@@ -101,16 +110,16 @@ flowchart LR
 
 ```mermaid
 flowchart TD
-    A["📄 Clean Dataset\n(783 data points × 18 komoditas)"] 
+    A["📦 dataup JSON Dataset\n(2021-2026, daerah & sumber included)"] 
     
-    B["🔀 Train/Test Split\nTrain: Jan 2023 – Sep 2025\nTest: Oct – Dec 2025 (90 hari)"]
+    B["🔀 Train/Test Split\nTrain: Jan 2021 – Sep 2025\nTest: Oct – Dec 2025 (90 hari)"]
     
     C["🏋️ Model Training"]
     
     subgraph "MLflow Experiment: arm-prophet-forecasting"
-        D1["Run 1: Beras Bawah I\nParams: yearly_seasonality=True\nMetrics: MAPE=1.39%"]
-        D2["Run 2: Cabai Merah\nParams: yearly_seasonality=True\nMetrics: MAPE=29.54%"]
-        D3["...\n(18 runs total)"]
+        D1["Run 1: Beras Bawah I (Banda Aceh)\nParams: yearly_seasonality=True\nMetrics: MAPE=1.39%"]
+        D2["Run 2: Cabai Merah (Aggregated)\nParams: yearly_seasonality=True\nMetrics: MAPE=29.54%"]
+        D3["...\n(84 runs total: 21 items × 4 regions)"]
     end
 
     E["📊 Baseline Comparison"]
@@ -124,7 +133,7 @@ flowchart TD
 
     G["🏆 Model Selection\nProphet dipilih:\n- MAPE terendah\n- Interpretable\n- Handle seasonality"]
 
-    H["💾 Model Registry\nAzure ML Model Store\n18 model artifacts (.pkl)"]
+    H["💾 Model Registry\nAzure ML Model Store\n84 model artifacts (.pkl)"]
 
     A --> B --> C
     C --> D1
@@ -146,33 +155,33 @@ flowchart TD
 flowchart TD
     A["⏰ Timer Trigger\nSetiap hari 08:00 WIB"]
     
-    B["🌐 Step 1: Scrape PIHPS\nFetch harga 18 komoditas\nHari ini dari bi.go.id"]
+    B["🌐 Step 1: Scrape PIHPS\nFetch harga harian\ndari bi.go.id"]
     
     C{"Data berhasil\ndi-scrape?"}
     
-    D["📦 Step 2: Save to Blob\nAppend ke historical_data.json\ndi Azure Blob Storage"]
+    D["📦 Step 2: Save to Blob\nAppend data baru harian ke\n2026.json di Blob Storage"]
     
-    E["🔍 Step 3: Anomaly Check\nHitung Z-Score harga hari ini\nvs MA30 historis"]
+    E["🔍 Step 3: Anomaly Check\nHitung Z-Score harga hari ini\nvs MA30 di RAM"]
     
-    F{"Anomali\nterdeteksi?"}
+    F["🧠 Step 3B: Prophet EWS\nRetrain 84 model & forecast\n90 hari + hitung EWS spike"]
     
-    G["📊 Step 4: Update Dashboard\nGenerate dashboard_data.json\nUpload ke Blob Storage"]
+    G["📊 Step 4: Update Dashboard\nGenerate dashboard_data.json\nterkompresi & unggah ke Blob"]
     
-    H["📲 Step 5: Send Alert\nTelegram notification\nke Satgas Pangan"]
+    H["📲 Step 5: Send Alert\nTelegram notification\n(Z-Score + EWS alerts)"]
     
-    I["📝 Step 6: Log\nCatat hasil pipeline\ndi Azure Monitor"]
+    I["📝 Step 6: MLOps Tracking\nKirim metrik harian via MLflow\nke Azure ML Studio"]
     
-    J["⚠️ Error Handler\nLog error\nRetry 3x\nFallback: gunakan data kemarin"]
+    J["⚠️ Error Handler\nLog error & retry 3x\nFallback: gunakan data kemarin"]
 
     A --> B --> C
-    C -->|"Ya"| D --> E --> F
+    C -->|"Ya"| D --> E --> F --> G --> I
     C -->|"Gagal"| J --> I
-    F -->|"Ya (Z>2σ)"| H --> G --> I
-    F -->|"Tidak"| G
+    F -->|"Z-Score > 2σ\natau EWS > 20%"| H --> G
     
     style H fill:#ef4444,color:#fff
     style A fill:#3b82f6,color:#fff
     style G fill:#22c55e,color:#fff
+    style F fill:#8b5cf6,color:#fff
 ```
 
 ---
