@@ -388,3 +388,128 @@ def add_features(df: pd.DataFrame) -> pd.DataFrame:
 
     logger.info("Added %d features to DataFrame", 8)  # lag×3 + rolling×2 + momentum + dow + holiday
     return df
+
+
+# ══════════════════════════════════════════════════════════════════════
+# HOLIDAY FEATURE ENGINEERING — Prophet Extra Regressors (G12)
+# Author: Aulia (ML & Azure)
+# ══════════════════════════════════════════════════════════════════════
+# These features are DETERMINISTIC: their values can be computed for any
+# future date, making them valid for Prophet's make_future_dataframe().
+# This is the "secret weapon" — Meugang local wisdom from Aceh.
+#
+# Golden Rule: Prophet Extra Regressors MUST have known values in the
+# future. Lag/rolling features violate this rule (price_lag_1d for
+# day +89 is unknown). Holiday/event flags do NOT violate it.
+# ══════════════════════════════════════════════════════════════════════
+
+# Tanggal resmi tradisi Meugang di Aceh (H-0 event)
+# Meugang terjadi 3× per tahun: menjelang Ramadan, Idul Fitri, Idul Adha
+# Sumber: Kemenag RI — kalender hari raya Islam
+MEUGANG_DATES = {
+    2021: ["2021-04-12", "2021-05-12", "2021-07-19"],
+    2022: ["2022-04-01", "2022-05-01", "2022-07-09"],
+    2023: ["2023-03-22", "2023-04-21", "2023-06-28"],
+    2024: ["2024-03-11", "2024-04-09", "2024-06-16"],
+    2025: ["2025-02-28", "2025-03-30", "2025-06-06"],
+    2026: ["2026-02-17", "2026-03-19", "2026-05-26"],
+}
+
+# Tanggal awal bulan Ramadan per tahun (H-0 = 1 Ramadan)
+# Sumber: Kemenag RI
+RAMADAN_START_DATES = {
+    2021: "2021-04-13",
+    2022: "2022-04-02",
+    2023: "2023-03-23",
+    2024: "2024-03-12",
+    2025: "2025-03-01",
+    2026: "2026-02-18",
+}
+
+
+def add_holiday_features(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Inject deterministic holiday/event flags as Prophet Extra Regressors.
+
+    All flags can be computed for ANY future date, making them valid for
+    Prophet's make_future_dataframe(). This function works on BOTH:
+    - Historical DataFrames from load_all_data() (has 'date' column)
+    - Future DataFrames from make_future_dataframe() (has 'ds' column)
+
+    Flags produced:
+        is_meugang_season : Tradisi Meugang Aceh (H-2 s/d H-0 event)
+                            → Demand shock daging sapi & bumbu dapur
+        is_ramadan_prep   : 7 hari menjelang Ramadan (persiapan puasa)
+                            → Demand shock bahan pokok
+        is_nataru          : Natal + Tahun Baru (20 Des - 2 Jan)
+                            → Demand shock protein & kebutuhan rumah tangga
+        is_wet_season      : Musim hujan BMKG Sumatera (Oktober - April)
+                            → Supply shock hortikultura (cabai, bawang)
+
+    Args:
+        df: DataFrame with 'date' or 'ds' column (datetime or string)
+
+    Returns:
+        DataFrame with 4 additional binary flag columns (0 or 1)
+
+    Author: Aulia (ML & Azure) — G12 Meugang Feature Engineering
+    """
+    df = df.copy()
+
+    # ── Detect date column name (historical='date', Prophet future='ds') ──
+    if 'date' in df.columns:
+        date_col = 'date'
+    elif 'ds' in df.columns:
+        date_col = 'ds'
+    else:
+        logger.warning("add_holiday_features: no 'date' or 'ds' column found")
+        return df
+
+    df[date_col] = pd.to_datetime(df[date_col])
+
+    # ── 1. is_meugang_season: Tradisi Meugang Aceh (H-2 s/d H-0) ──
+    df['is_meugang_season'] = 0
+    for year, date_list in MEUGANG_DATES.items():
+        for date_str in date_list:
+            target_date = pd.to_datetime(date_str)
+            start_range = target_date - pd.Timedelta(days=2)
+            mask = (df[date_col] >= start_range) & (df[date_col] <= target_date)
+            df.loc[mask, 'is_meugang_season'] = 1
+
+    # ── 2. is_ramadan_prep: 7 hari menjelang Ramadan ──
+    df['is_ramadan_prep'] = 0
+    for year, date_str in RAMADAN_START_DATES.items():
+        ramadan_start = pd.to_datetime(date_str)
+        prep_start = ramadan_start - pd.Timedelta(days=7)
+        mask = (df[date_col] >= prep_start) & (df[date_col] < ramadan_start)
+        df.loc[mask, 'is_ramadan_prep'] = 1
+
+    # ── 3. is_nataru: Natal + Tahun Baru (20 Des - 2 Jan) ──
+    df['is_nataru'] = 0
+    # Get unique years in the data
+    years_in_data = df[date_col].dt.year.unique()
+    for year in years_in_data:
+        # Natal period: 20 Dec of current year to 2 Jan of next year
+        nataru_start = pd.to_datetime(f"{year}-12-20")
+        nataru_end = pd.to_datetime(f"{year + 1}-01-02")
+        mask = (df[date_col] >= nataru_start) & (df[date_col] <= nataru_end)
+        df.loc[mask, 'is_nataru'] = 1
+
+    # ── 4. is_wet_season: Musim hujan BMKG Sumatera (Oktober - April) ──
+    # Curah hujan tinggi → gagal panen hortikultura → supply shock
+    df['is_wet_season'] = df[date_col].dt.month.isin(
+        [10, 11, 12, 1, 2, 3, 4]
+    ).astype(int)
+
+    # ── Logging ──
+    meugang_count = int(df['is_meugang_season'].sum())
+    ramadan_count = int(df['is_ramadan_prep'].sum())
+    nataru_count = int(df['is_nataru'].sum())
+    wet_count = int(df['is_wet_season'].sum())
+    logger.info(
+        "Holiday features injected: meugang=%d, ramadan_prep=%d, "
+        "nataru=%d, wet_season=%d rows flagged (total rows: %d)",
+        meugang_count, ramadan_count, nataru_count, wet_count, len(df)
+    )
+
+    return df

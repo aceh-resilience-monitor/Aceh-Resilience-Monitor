@@ -7,3 +7,9 @@ openpyxl>=3.1
 prophet>=1.1.5
 pytest>=7.0
 pytest-cov>=4.0
+# ── Week 2: Azure & MLOps dependencies (Author: Aulia) ──
+mlflow>=2.10
+azureml-core>=1.56
+azureml-mlflow>=1.56
+azure-storage-blob>=12.19
+requests>=2.31

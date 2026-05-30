@@ -128,6 +128,62 @@ Untuk sistem peringatan dini Prophet 90 hari ke depan, kami menggunakan batas ke
 
 ---
 
+## 🔴 Error Analysis & Failure Modes (G18)
+
+> Author: Arief (Test, Docs & Comms) — G18
+
+### Komoditas dengan MAPE > 20% — Analisis Penyebab & Mitigasi
+
+| Komoditas | MAPE | Penyebab Utama | Mitigasi |
+|---|---|---|---|
+| **Bawang Merah** | 32.87% | Siklus panen irregular, gagal panen cuaca | Human review flag + data curah hujan (roadmap) |
+| **Cabai Merah Keriting** | 29.54% | Volatilitas ekstrem, supply shock musiman | Threshold konservatif (2σ) + monitoring manual |
+| **Cabai Rawit Hijau** | 20.56% | Harga sangat sensitif terhadap cuaca | Meugang regressor + wet season flag (implementasi aktif) |
+
+### Apa Risiko Jika Model Salah?
+
+| Tipe Error | Risiko | Dampak | Probabilitas |
+|---|---|---|---|
+| **False Positive** (prediksi naik, kenyataan stabil) | Operasi pasar tidak perlu | 🟢 Rendah — biaya sia-sia kecil, tidak berbahaya | Sedang |
+| **False Negative** (prediksi stabil, kenyataan naik) | **RISIKO UTAMA** — kelangkaan pangan tidak terdeteksi | 🔴 Tinggi — masyarakat terdampak langsung | Rendah (mitigasi: threshold 2σ) |
+
+### Strategi Mitigasi Risiko
+
+> [!IMPORTANT]
+> **ARM dirancang sebagai DECISION SUPPORT, bukan DECISION MAKER.**
+> Model memberikan alert dan rekomendasi, manusia (TPID/Satgas Pangan) membuat keputusan final.
+
+1. **Threshold Konservatif (2σ bukan 3σ):** Lebih banyak false positive, tapi meminimalisir false negative yang berbahaya
+2. **Confidence Interval di Dashboard:** Menampilkan `yhat_lower` dan `yhat_upper`, bukan single number prediction
+3. **Human Oversight:** Dashboard + Telegram alert = decision support layer, bukan autopilot
+4. **Meugang Extra Regressor (BARU):** Menyuntikkan fitur kearifan lokal sebagai Prophet Extra Regressor untuk meningkatkan akurasi saat hari raya
+
+### Honest Limitations
+
+1. **Model Univariat:** Prophet hanya membaca pola harga historis, belum include faktor cuaca, BBM, kebijakan pemerintah
+2. **Data PIHPS:** Terbatas pada pasar tradisional yang tercakup PIHPS Bank Indonesia
+3. **Hortikultura Sulit Diprediksi:** Cabai, bawang merah, cabai rawit memiliki volatilitas ekstrem yang inherent
+4. **Meugang Dates Hardcoded:** Tanggal hari raya Islam ditentukan secara manual (perlu update tahunan)
+
+---
+
+## 🌟 Feature Engineering: Kearifan Lokal Meugang (G12)
+
+> Author: Aulia (ML & Azure) — G12
+
+Untuk mengatasi kelemahan model univariat, kami menyuntikkan **fitur kearifan lokal Aceh** sebagai Prophet Extra Regressor:
+
+| Fitur | Deskripsi | Dampak pada Komoditas |
+|---|---|---|
+| `is_meugang_season` | Tradisi Meugang Aceh (H-2 s/d H-0 hari raya) | Daging Sapi, Cabai, Bawang |
+| `is_ramadan_prep` | 7 hari menjelang Ramadan | Bahan pokok, bumbu dapur |
+| `is_nataru` | Natal + Tahun Baru (20 Des - 2 Jan) | Protein, kebutuhan rumah tangga |
+| `is_wet_season` | Musim hujan BMKG (Oktober - April) | Hortikultura (supply shock) |
+
+> **Golden Rule:** Semua fitur ini bersifat **deterministik** — nilainya dapat dihitung untuk tanggal masa depan. Ini memenuhi syarat Prophet Extra Regressor yang wajib diketahui nilainya selama periode prediksi 90 hari.
+
+---
+
 ## 🎯 Analisis Kegagalan & Rekomendasi 
 
 ### Mengapa AI Gagal pada Komoditas Cabai & Bawang?
@@ -136,7 +192,10 @@ Algoritma Prophet (seperti algoritma time-series klasik lainnya) adalah model **
 ### *Roadmap* Solusi (Fase 3 Pembangunan Parameter AI)
 Untuk mengatasi kelemahan margin error sebesar 30% pada komoditas sayur-mayur, proyek *Aceh Resilience Monitor* harus melibatkan transisi model AI prediktif, dari Univariat menjadi **Multivariat**.
 
+0. **Fitur Kearifan Lokal Meugang (✅ IMPLEMENTASI AKTIF):**
+   * Menyuntikkan tradisi Meugang Aceh, musim Ramadan, Natal/Tahun Baru, dan musim hujan sebagai Extra Regressor di Prophet. Sudah terimplementasi di `scripts/etl.py` dan `scripts/forecast.py`.
 1. **Integrasi Data Cuaca (BMKG API):**
    * Feed curah hujan regional ke dalam model (seperti **XGBoost Regressor** atau mengaktifkan fitur *add_regressor* di Prophet). AI akan belajar pola: *"Jika curah hujan di Takengon melampaui 100mm, harga Cabai akan fluktuatif naik dalam 14 hari"*.
 2. **Indeks Harga BBM Transportasi:**
    * Memasukkan data historis kenaikan pertalite/solar sebagai pengukur inflasi biaya logistik per bulan ke model AI.
+

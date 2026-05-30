@@ -50,7 +50,8 @@ except ImportError:
 # Import ARM modules
 try:
     from scripts.config import ALL_REGIONS, FORECAST_DAYS
-    from scripts.etl import load_all_data, aggregate_prices
+    from scripts.etl import load_all_data, aggregate_prices, add_holiday_features
+    from scripts.forecast import HOLIDAY_REGRESSORS
 except ImportError as e:
     logger.error(f"Failed to import ARM modules: {e}")
     sys.exit(1)
@@ -105,6 +106,7 @@ def calculate_metrics(y_true, y_pred):
 
 def train_and_log_models():
     # 1. Setup Tracking
+    # Author: Aulia (ML & Azure) — G12 MLflow Integration
     setup_mlflow_tracking()
     mlflow.set_experiment("arm-prophet-forecasting")
     
@@ -126,6 +128,10 @@ def train_and_log_models():
         pdf['ds'] = pd.to_datetime(pdf['ds'])
         pdf = pdf.sort_values('ds').reset_index(drop=True)
         
+        # Inject holiday features (Meugang, Ramadan, Nataru, Wet Season)
+        # Author: Aulia (ML & Azure) — G12 Meugang Feature Engineering
+        pdf = add_holiday_features(pdf)
+        
         # Insufficient data check
         if len(pdf) < 60:
             logger.warning(f"Skipping {commodity}: insufficient data ({len(pdf)} rows)")
@@ -133,10 +139,14 @@ def train_and_log_models():
             
         logger.info(f"[{idx}/{len(commodities)}] Logging run for: {commodity}")
         
+        # Determine which regressors are available
+        active_regressors = [r for r in HOLIDAY_REGRESSORS if r in pdf.columns]
+        
         # Start MLflow run
         with mlflow.start_run(run_name=f"prophet-{commodity.lower().replace(' ', '_')}"):
             # ────────────────────────────────────────────────────────
             # 1. Log Hyperparameters & Parameters
+            # Author: Aulia (ML & Azure)
             # ────────────────────────────────────────────────────────
             mlflow.log_param("commodity", commodity)
             mlflow.log_param("yearly_seasonality", True)
@@ -145,6 +155,8 @@ def train_and_log_models():
             mlflow.log_param("seasonality_mode", "multiplicative")
             mlflow.log_param("changepoint_prior_scale", 0.05)
             mlflow.log_param("total_historical_days", len(pdf))
+            mlflow.log_param("extra_regressors", ','.join(active_regressors) if active_regressors else 'none')
+            mlflow.log_param("has_meugang_regressor", 'is_meugang_season' in active_regressors)
             
             # ────────────────────────────────────────────────────────
             # 2. Backtesting (Train/Test Split) for Metrics Evaluation
@@ -158,7 +170,8 @@ def train_and_log_models():
             
             if len(train_pdf) >= 30 and len(val_pdf) > 0:
                 try:
-                    # Train model on training partition
+                    # Train model on training partition with holiday regressors
+                    # Author: Aulia (ML & Azure) — G12
                     eval_model = Prophet(
                         yearly_seasonality=True,
                         weekly_seasonality=False,
@@ -166,10 +179,16 @@ def train_and_log_models():
                         seasonality_mode='multiplicative',
                         changepoint_prior_scale=0.05
                     )
+                    
+                    # Register holiday Extra Regressors for backtesting
+                    for reg in active_regressors:
+                        eval_model.add_regressor(reg)
+                    
                     eval_model.fit(train_pdf)
                     
-                    # Predict validation period
+                    # Predict validation period with holiday features injected
                     future = eval_model.make_future_dataframe(periods=len(val_pdf))
+                    future = add_holiday_features(future)  # Inject for future dates!
                     forecast = eval_model.predict(future)
                     
                     # Merge predictions and actuals on date to align correctly
@@ -212,6 +231,7 @@ def train_and_log_models():
             
             # ────────────────────────────────────────────────────────
             # 4. Train Final Model on 100% Data and Log as Artifact
+            # Author: Aulia (ML & Azure)
             # ────────────────────────────────────────────────────────
             final_model = Prophet(
                 yearly_seasonality=True,
@@ -220,11 +240,17 @@ def train_and_log_models():
                 seasonality_mode='multiplicative',
                 changepoint_prior_scale=0.05
             )
+            
+            # Register holiday Extra Regressors for final model
+            for reg in active_regressors:
+                final_model.add_regressor(reg)
+            
             final_model.fit(pdf)
             
             # Save final model state
             mlflow.prophet.log_model(final_model, artifact_path="model")
-            logger.info(f"✅ {commodity} logged. MAPE = {mape:.2f}% | Rating = {rating}")
+            regressors_str = f" | Regressors: {', '.join(active_regressors)}" if active_regressors else ""
+            logger.info(f"✅ {commodity} logged. MAPE = {mape:.2f}% | Rating = {rating}{regressors_str}")
             
     # ────────────────────────────────────────────────────────
     # 5. Print Executive Summary Table

@@ -21,12 +21,22 @@ from typing import Dict, List, Optional
 import pandas as pd
 
 from scripts.config import ALL_REGIONS, FORECAST_DAYS
-from scripts.etl import aggregate_prices
+from scripts.etl import aggregate_prices, add_holiday_features
 
 logger = logging.getLogger(__name__)
 
 # Suppress Prophet/Stan verbose output
 warnings.filterwarnings('ignore', category=FutureWarning)
+
+
+# List of holiday feature columns used as Prophet Extra Regressors
+# Author: Aulia (ML & Azure) — G12 Meugang Feature Engineering
+HOLIDAY_REGRESSORS = [
+    'is_meugang_season',  # Tradisi Meugang Aceh (H-2 s/d H-0)
+    'is_ramadan_prep',    # 7 hari menjelang Ramadan
+    'is_nataru',          # Natal + Tahun Baru (20 Des - 2 Jan)
+    'is_wet_season',      # Musim hujan BMKG Sumatera (Okt-Apr)
+]
 
 
 def train_prophet(
@@ -41,14 +51,18 @@ def train_prophet(
     - Yearly seasonality enabled (captures Ramadan, harvest cycles)
     - Weekly seasonality disabled by default (daily prices are noisy)
     - Multiplicative seasonality (price changes are proportional)
+    - Extra Regressors: Meugang, Ramadan, Nataru, Wet Season (G12)
 
     Args:
         df_commodity: DataFrame with columns 'ds' (datetime) and 'y' (price)
+                      May also contain holiday feature columns.
         yearly_seasonality: Enable yearly seasonality detection
         weekly_seasonality: Enable weekly seasonality detection
 
     Returns:
         Fitted Prophet model
+
+    Author: Aulia (ML & Azure)
     """
     from prophet import Prophet
 
@@ -59,6 +73,17 @@ def train_prophet(
         seasonality_mode='multiplicative',
         changepoint_prior_scale=0.05,
     )
+
+    # Register holiday Extra Regressors if columns are present (G12)
+    # Author: Aulia (ML & Azure) — Meugang local wisdom feature engineering
+    registered = []
+    for regressor in HOLIDAY_REGRESSORS:
+        if regressor in df_commodity.columns:
+            model.add_regressor(regressor)
+            registered.append(regressor)
+
+    if registered:
+        logger.info("Prophet regressors registered: %s", ', '.join(registered))
 
     model.fit(df_commodity)
     return model
@@ -71,14 +96,28 @@ def predict_future(
     """
     Generate forecast from a trained Prophet model.
 
+    Injects holiday features into the future dataframe so Prophet
+    can apply learned regressor effects to predictions. This is the
+    key step that makes Meugang predictions work for future dates.
+
     Args:
         model: Fitted Prophet model
         periods: Number of days to forecast (default: 90)
 
     Returns:
         DataFrame with columns: ds, yhat, yhat_lower, yhat_upper
+
+    Author: Aulia (ML & Azure)
     """
     future = model.make_future_dataframe(periods=periods)
+
+    # Inject holiday features into future dataframe (deterministic)
+    # Author: Aulia (ML & Azure) — G12 Prophet Extra Regressor injection
+    # Without this, Prophet will crash with "Regressor is_meugang_season
+    # missing from dataframe" error.
+    if any(reg in (model.extra_regressors or {}) for reg in HOLIDAY_REGRESSORS):
+        future = add_holiday_features(future)
+
     forecast = model.predict(future)
 
     # Return only the forecast period (not historical fitted values)
@@ -115,6 +154,10 @@ def _forecast_single_series(
     prophet_df = df_series[['date', 'price']].rename(
         columns={'date': 'ds', 'price': 'y'}
     ).copy()
+
+    # Inject holiday features into training data (Meugang, Ramadan, Nataru, wet season)
+    # Author: Aulia (ML & Azure) — G12 Feature Engineering
+    prophet_df = add_holiday_features(prophet_df)
 
     try:
         model = train_prophet(prophet_df)
