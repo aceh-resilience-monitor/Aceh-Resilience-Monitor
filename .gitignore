@@ -62,7 +62,6 @@ local.settings.json
 *.key
 *.cert
 
-# ===========================
 # Project Specific Excludes
 # ===========================
 .coverage
@@ -72,5 +71,9 @@ modul_implementation.md
 dataup/data/
 arm_audit_report.md
 
-
-
+# ===========================
+# MLflow & Local DBs
+# ===========================
+mlflow.db
+mlruns/
+*.db
