@@ -4,6 +4,11 @@
 > *Dokumen ini merangkum seluruh insight penting, keputusan desain sistem yang telah disetujui, dan blueprint teknis dari hasil diskusi tim dengan AI Agent untuk diimplementasikan ke dalam kode.*
 > *Target: Skor 95+ (Juara Datathon Dicoding) | Peran Utama: Aulia (ML & Azure), Ilhaam (Code & Frontend), Arief (Test & Docs)*
 
+> [!NOTE]
+> **REVISI TEKNIS BLUEPRINT (Juni 2026):**
+> *   ✅ **Pilihan Arsitektur:** Telah disetujui dan diimplementasikan **Opsi 1 (Pendekatan Hibrida)**. Model Prophet dilatih harian secara *on-the-fly* di RAM Azure Functions harian (21 komoditas × 4 model = 84 model di RAM), sementara MLflow mencatat metrik agregat produksi harian ke Azure ML Studio.
+> *   ✅ **Keselarasan Runtime:** Menggunakan **Python 3.11** untuk lingkungan produksi cloud Azure Functions, dan sepenuhnya kompatibel dengan Python 3.10 s/d 3.14 pada lingkungan lokal developer tim.
+
 ---
 
 ## 📋 Daftar Isi

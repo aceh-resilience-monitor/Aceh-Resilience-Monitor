@@ -3,6 +3,14 @@
 > **Ditulis dari NOL** — untuk tim yang belum pernah pakai layanan ini.
 > **Deadline:** 5 Juni 2026
 
+> [!NOTE]
+> **STATUS DEPLOYMENT AKTUAL (Juni 2026):**
+> *   ✅ **Azure ML Workspace:** Aktif (`arm-ml-workspace`) terintegrasi dengan MLflow untuk logging parameter harian.
+> *   ✅ **Azure Functions Core Tools:** Terinstal di macOS (v4) untuk pengujian lokal.
+> *   ✅ **Azure Functions (Cloud):** Aktif (`arm-daily-pipeline-74220`) berjalan harian otomatis pukul 08:00 WIB (01:00 UTC) menggunakan **Python 3.11** untuk kompatibilitas cloud maksimal.
+> *   ✅ **Azure Blob Storage:** Berkas historis harian (`2021.json` s/d `2026.json`) diunggah di container `arm-raw-data`.
+> *   ✅ **Telegram Alerts:** Modul alert (`telegram_alert.py`) aktif dengan sistem fallback konsol yang aman.
+
 ---
 
 ## 📍 Kondisi Saat Ini vs Target

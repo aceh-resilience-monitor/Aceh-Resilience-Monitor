@@ -2,6 +2,10 @@
 
 > Semua diagram siap dipakai di README, presentasi, dan `docs/azure_architecture.md`.
 
+> [!NOTE]
+> **VERIFIKASI ALUR DATA (Juni 2026):**
+> *   Seluruh alur data harian (*daily automated pipeline*) dari **Scraping (dataup/helper.js ref) ➔ ETL & Feature Engineering ➔ Z-Score Anomaly ➔ In-Memory Prophet Training (84 model) ➔ Dashboard Data Compression ➔ Telegram Alerting** telah diimplementasikan penuh, lulus pengujian lokal, dan terintegrasi di cloud Azure.
+
 ---
 
 ## 1. Arsitektur Sistem (Overview)

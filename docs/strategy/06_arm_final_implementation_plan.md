@@ -153,12 +153,12 @@ Tambah section di `evaluation_prophet.md`:
 
 **👤 Seluruh Tim**
 ```
-☐ python scripts/prepare_dashboard_data.py → no errors
-☐ python scripts/save_plots.py → no errors
-☐ python -m pytest tests/ → all pass
-☐ Cek: tidak ada print() tersisa (hanya logging)
-☐ Cek: tidak ada duplikasi CATEGORY_MAP
-☐ Code review silang antar anggota
+✅ python scripts/prepare_dashboard_data.py → no errors
+✅ python scripts/save_plots.py → no errors
+✅ python -m pytest tests/ → all pass
+✅ Cek: tidak ada print() tersisa (hanya logging)
+✅ Cek: tidak ada duplikasi CATEGORY_MAP
+✅ Code review silang antar anggota
 ```
 
 ---
@@ -347,27 +347,27 @@ Cell 7: "## 6. Hasil & Rekomendasi"
 **👤 Seluruh Tim — Integration Test**
 ```
 End-to-end test:
-☐ Azure Function trigger → data masuk Blob
-☐ Dashboard menampilkan data terbaru
-☐ Telegram alert terkirim
-☐ MLflow experiments tercatat di Azure ML Studio
-☐ Notebook bisa di-run dari awal sampai akhir
-☐ All unit tests pass
+✅ Azure Function trigger → data masuk Blob
+✅ Dashboard menampilkan data terbaru
+✅ Telegram alert terkirim
+✅ MLflow experiments tercatat di Azure ML Studio
+✅ Notebook bisa di-run dari awal sampai akhir
+✅ All unit tests pass
 ```
 
 ---
 
 ### ✅ Checkpoint Minggu 2 (27 Mei)
 
-| Gap | Deliverable | Owner | ☐ |
+| Gap | Deliverable | Owner | Status |
 |---|---|---|---|
-| G12 | Azure ML + 21/84 MLflow experiments | Aulia | ☐ |
-| G13 | Azure Functions deployed + daily trigger | Aulia | ☐ |
-| G14 | Azure architecture documented | Arief | ☐ |
-| G15 | Telegram bot active | Arief | ☐ |
-| G7 | Rekomendasi spesifik per komoditas | Arief | ☐ |
-| G16 | Notebook `analysis_walkthrough.ipynb` | Aulia | ☐ |
-| G18 | Error analysis + failure modes documented | Arief | ☐ |
+| G12 | Azure ML + 21/84 MLflow experiments | Aulia | ✅ |
+| G13 | Azure Functions deployed + daily trigger | Aulia | ✅ |
+| G14 | Azure architecture documented | Arief | ✅ |
+| G15 | Telegram bot active | Arief | ✅ |
+| G7 | Rekomendasi spesifik per komoditas | Arief | ✅ |
+| G16 | Notebook `analysis_walkthrough.ipynb` | Aulia | ✅ |
+| G18 | Error analysis + failure modes documented | Arief | ✅ |
 
 ---
 
@@ -378,26 +378,26 @@ End-to-end test:
 **👤 Aulia — Update evaluation_prophet.md**
 ```
 Pastikan berisi:
-☐ Baseline comparison (Naive, SMA, EMA vs Prophet)
-☐ AutoML comparison (jika ada)
-☐ Error analysis & failure modes
-☐ Justifikasi threshold
-☐ Model parameter documentation (MLflow reference)
+✅ Baseline comparison (Naive, SMA, EMA vs Prophet)
+✅ AutoML comparison (jika ada)
+✅ Error analysis & failure modes
+✅ Justifikasi threshold
+✅ Model parameter documentation (MLflow reference)
 ```
 
 **👤 Ilhaam — Update project_brief + README**
 ```
 project_brief_final.md:
-☐ Update teknologi (+ Azure ML, Functions, Telegram)
-☐ Update arsitektur diagram
-☐ Hapus semua "real-time" → "daily automated"
+✅ Update teknologi (+ Azure ML, Functions, Telegram)
+✅ Update arsitektur diagram
+✅ Hapus semua "real-time" → "daily automated"
 
 README.md:
-☐ Tambah section "Arsitektur Sistem" (mermaid diagram)
-☐ Tambah section "Azure Services" 
-☐ Tambah section "Cara Menjalankan" (setup instructions)
-☐ Tambah screenshots Azure ML Studio + Functions
-☐ Tambah section "Skalabilitas" → G19:
+✅ Tambah section "Arsitektur Sistem" (mermaid diagram)
+✅ Tambah section "Azure Services" 
+✅ Tambah section "Cara Menjalankan" (setup instructions)
+✅ Tambah screenshots Azure ML Studio + Functions
+✅ Tambah section "Skalabilitas" → G19:
    "Arsitektur modular: untuk ekspansi ke 34 provinsi, cukup 
     tambahkan data source per provinsi. Azure Functions scale
     otomatis. Cost per provinsi: ~$0/bulan (free tier)."
