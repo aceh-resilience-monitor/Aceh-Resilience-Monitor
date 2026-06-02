@@ -15,6 +15,10 @@ let selectedRegion = 'aggregated';
 let spatialCommodity = 'Cabai Merah Keriting';
 let activeTab = 'tab-executive';
 
+// Leaflet GIS Map Variables (Modul I)
+let mapInstance = null;
+let mapMarkers = {};
+
 // ── Tab Navigation (Modul E) ─────────────────────────────────────
 function switchTab(tabId) {
   activeTab = tabId;
@@ -26,13 +30,19 @@ function switchTab(tabId) {
   document.querySelectorAll('.tab-content').forEach(tc => {
     tc.classList.toggle('active', tc.id === tabId);
   });
-  // Resize Chart.js instances to prevent "gepeng" on hidden tabs
+  
+  // Resize Chart.js & Leaflet Map to prevent layout glitch on tab switches
   requestAnimationFrame(() => {
     Object.values(charts).forEach(c => {
       if (c && typeof c.resize === 'function') {
         c.resize();
       }
     });
+    if (tabId === 'tab-executive' && mapInstance) {
+      setTimeout(() => {
+        mapInstance.invalidateSize();
+      }, 50);
+    }
   });
   // Lazy-render tab content on first visit
   if (tabId === 'tab-spatial' && !window._spatialRendered) {
@@ -151,6 +161,55 @@ async function loadData() {
   }
 }
 
+// ── Initialize Leaflet Map (Modul I — Real Geography) ─────────────
+function initLeafletMap() {
+  try {
+    // Coordinate of Aceh Center: [4.4, 96.5], Zoom: 7.5
+    mapInstance = L.map('aceh-leaflet-map', {
+      zoomControl: true,
+      attributionControl: false,
+      scrollWheelZoom: false
+    }).setView([4.4, 96.5], 7.5);
+
+    // CartoDB Dark Matter tiles (premium dark mode GIS style)
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+      maxZoom: 18,
+      subdomains: 'abcd'
+    }).addTo(mapInstance);
+
+    const cities = {
+      'Banda Aceh': [5.5483, 95.3238],
+      'Lhokseumawe': [5.1801, 97.1507],
+      'Meulaboh': [4.1449, 96.1269]
+    };
+
+    Object.entries(cities).forEach(([cityName, coords]) => {
+      // Custom pulse div icon
+      const customIcon = L.divIcon({
+        className: 'map-pulse-marker normal',
+        html: `<div class="pulse-ring"></div><div class="pulse-dot"></div><span class="marker-label">${cityName}</span>`,
+        iconSize: [20, 20],
+        iconAnchor: [10, 10]
+      });
+
+      const marker = L.marker(coords, { icon: customIcon }).addTo(mapInstance);
+      
+      // Interactive Click to change active region
+      marker.on('click', () => {
+        const selector = document.getElementById('region-selector');
+        if (selector) {
+          selector.value = cityName;
+          changeRegion(cityName);
+        }
+      });
+
+      mapMarkers[cityName] = marker;
+    });
+  } catch (err) {
+    console.error('Error initializing Leaflet map:', err);
+  }
+}
+
 // ── Initialize App ───────────────────────────────────────────────
 async function initApp() {
   const loaded = await loadData();
@@ -158,6 +217,9 @@ async function initApp() {
     document.getElementById('loading-text').textContent = 'Gagal memuat data!';
     return;
   }
+
+  // Initialize interactive geographical map first
+  initLeafletMap();
 
   // Tab 1 (Executive) — render immediately
   renderKPIs();
@@ -1745,13 +1807,7 @@ function renderMarginHealthTab() {
 // ══════════════════════════════════════════════════════════════════
 
 function updateSVGMap() {
-  if (!DATA || !DATA.anomalies) return;
-
-  const regionMapping = {
-    'Banda Aceh': 'region-banda-aceh',
-    'Lhokseumawe': 'region-lhokseumawe',
-    'Meulaboh': 'region-meulaboh',
-  };
+  if (!DATA || !DATA.anomalies || !mapInstance) return;
 
   // Aggregate anomaly severity per region from recent anomalies
   const regionStatus = { 'Banda Aceh': 'normal', 'Lhokseumawe': 'normal', 'Meulaboh': 'normal' };
@@ -1773,14 +1829,24 @@ function updateSVGMap() {
     }
   });
 
-  // Apply CSS classes
-  Object.entries(regionMapping).forEach(([region, svgId]) => {
-    const el = document.getElementById(svgId);
-    if (!el) return;
-    el.classList.remove('glow-anomaly-red', 'glow-anomaly-yellow', 'glow-normal');
-    if (regionStatus[region] === 'critical') el.classList.add('glow-anomaly-red');
-    else if (regionStatus[region] === 'warning') el.classList.add('glow-anomaly-yellow');
-    else el.classList.add('glow-normal');
+  // Apply Leaflet marker class updates dynamically
+  Object.entries(regionStatus).forEach(([cityName, status]) => {
+    const marker = mapMarkers[cityName];
+    if (!marker) return;
+
+    let statusClass = 'normal';
+    if (status === 'critical') statusClass = 'critical';
+    else if (status === 'warning') statusClass = 'warning';
+
+    // Update marker icon
+    const customIcon = L.divIcon({
+      className: `map-pulse-marker ${statusClass}`,
+      html: `<div class="pulse-ring"></div><div class="pulse-dot"></div><span class="marker-label">${cityName}</span>`,
+      iconSize: [20, 20],
+      iconAnchor: [10, 10]
+    });
+
+    marker.setIcon(customIcon);
   });
 
   // Update summary text

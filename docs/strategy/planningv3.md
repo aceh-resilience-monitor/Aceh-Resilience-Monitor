@@ -372,13 +372,13 @@ Jadi overhaul utamanya adalah **restrukturisasi layout ke 4 tab** + tambah fitur
 - ✅ Step 6: `dashboard_data.json` terbaru ter-upload ke `$web`
 
 #### Dashboard (Frontend)
-- [ ] Tab 1 (Executive): KPI cards, status grid, anomaly table, heatmap
-- [ ] Tab 2 (Spatial): Regional comparison, arbitrage advisor text
-- [ ] Tab 3 (Margin): Supply chain flow semua komoditas, health badges
-- [ ] Tab 4 (Forecast): EWS cards, price trend + confidence bands
-- [ ] Perpindahan tab smooth (no Chart.js gepeng)
-- [ ] Dashboard loads < 3 detik
-- [ ] Mobile responsive (basic)
+- ✅ Tab 1 (Executive): KPI cards, status grid, anomaly table, heatmap
+- ✅ Tab 2 (Spatial): Regional comparison, arbitrage advisor text
+- ✅ Tab 3 (Margin): Supply chain flow semua komoditas, health badges
+- ✅ Tab 4 (Forecast): EWS cards, price trend + confidence bands
+- ✅ Perpindahan tab smooth (no Chart.js gepeng)
+- ✅ Dashboard loads < 3 detik
+- ✅ Mobile responsive (basic)
 
 #### Telegram Bot
 - ✅ Alert terkirim ke group saat pipeline jalan

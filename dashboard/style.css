@@ -1718,3 +1718,126 @@ body::before {
   display: inline-block;
 }
 
+/* ══════════════════════════════════════════════════════════════════
+   LEAFLET MAP CUSTOM STYLING (Interactive GIS Map)
+   ══════════════════════════════════════════════════════════════════ */
+
+/* Custom glowing pulse Leaflet markers */
+.map-pulse-marker {
+  position: relative;
+  width: 20px;
+  height: 20px;
+  pointer-events: auto;
+}
+
+.map-pulse-marker .pulse-dot {
+  width: 10px;
+  height: 10px;
+  background: var(--accent-teal);
+  border: 1.5px solid #ffffff;
+  border-radius: 50%;
+  position: absolute;
+  top: 5px;
+  left: 5px;
+  z-index: 10;
+  box-shadow: 0 0 8px rgba(0, 0, 0, 0.6);
+  transition: background-color 0.3s ease;
+}
+
+.map-pulse-marker .pulse-ring {
+  border: 3px solid var(--accent-teal);
+  border-radius: 50%;
+  height: 26px;
+  width: 26px;
+  position: absolute;
+  left: -3px;
+  top: -3px;
+  animation: mapMarkerPulse 2.2s ease-out infinite;
+  opacity: 0;
+  transition: border-color 0.3s ease;
+}
+
+/* Severity styles */
+.map-pulse-marker.critical .pulse-dot {
+  background: #ef4444;
+  box-shadow: 0 0 10px rgba(239, 68, 68, 0.8);
+}
+.map-pulse-marker.critical .pulse-ring {
+  border-color: #ef4444;
+}
+
+.map-pulse-marker.warning .pulse-dot {
+  background: #f59e0b;
+  box-shadow: 0 0 8px rgba(245, 158, 11, 0.8);
+}
+.map-pulse-marker.warning .pulse-ring {
+  border-color: #f59e0b;
+}
+
+.map-pulse-marker.normal .pulse-dot {
+  background: var(--accent-teal);
+  box-shadow: 0 0 8px rgba(20, 184, 166, 0.8);
+}
+.map-pulse-marker.normal .pulse-ring {
+  border-color: var(--accent-teal);
+}
+
+/* Float labels */
+.map-pulse-marker .marker-label {
+  position: absolute;
+  top: -24px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(15, 23, 42, 0.85);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: var(--text-secondary);
+  font-family: 'Inter', sans-serif;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 4px;
+  white-space: nowrap;
+  pointer-events: none;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+  transition: all 0.3s ease;
+}
+
+.map-pulse-marker:hover .marker-label {
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.2);
+  background: rgba(30, 41, 59, 0.95);
+  transform: translateX(-50%) scale(1.05);
+}
+
+@keyframes mapMarkerPulse {
+  0% {
+    transform: scale(0.1);
+    opacity: 0;
+  }
+  50% {
+    opacity: 0.8;
+  }
+  100% {
+    transform: scale(1.6);
+    opacity: 0;
+  }
+}
+
+/* Set leaflet container dark look override */
+.leaflet-container {
+  background: #090d16 !important;
+  font-family: 'Inter', sans-serif !important;
+}
+
+/* Float legend legend pulse styling */
+.map-floating-legend .legend-pulse {
+  animation: legendDotPulse 2s ease-in-out infinite;
+}
+
+@keyframes legendDotPulse {
+  0%, 100% { opacity: 0.7; }
+  50% { opacity: 1; }
+}
+

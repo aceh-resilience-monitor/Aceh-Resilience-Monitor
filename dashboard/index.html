@@ -15,6 +15,10 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
 
+  <!-- Leaflet Map Integration (Interactive GIS Map) -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+
   <!-- Styles -->
   <link rel="stylesheet" href="style.css">
 </head>
@@ -92,68 +96,28 @@
             <p class="section-desc">Daerah berwarna merah/kuning menunjukkan anomali harga aktif (Z-Score &gt; 2σ)</p>
           </div>
         </div>
-        <div class="glass-card" id="aceh-map-container">
-          <svg id="aceh-svg-map" viewBox="0 0 800 500" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-height:380px;">
-            <!-- Ocean background -->
-            <rect width="800" height="500" fill="transparent"/>
-
-            <!-- Aceh Province Simplified Shape -->
-            <g id="aceh-province-group">
-              <!-- Main landmass -->
-              <path d="M200,80 Q250,40 350,35 Q450,30 520,60 Q580,85 620,130 Q650,170 660,220 Q665,260 650,300 Q630,340 590,370 Q550,395 500,410 Q450,420 400,430 Q350,435 300,420 Q250,400 210,370 Q170,340 150,300 Q135,260 140,220 Q145,180 160,140 Q175,105 200,80 Z"
-                    fill="rgba(30, 41, 59, 0.6)" stroke="rgba(255,255,255,0.1)" stroke-width="1.5"/>
-
-              <!-- Banda Aceh Region (Northwest) -->
-              <path id="region-banda-aceh" class="map-region"
-                    d="M200,80 Q225,55 270,45 Q300,40 320,50 Q310,80 290,110 Q260,130 230,135 Q200,130 185,115 Q175,100 200,80 Z"
-                    fill="var(--bg-card)" stroke="rgba(255,255,255,0.15)" stroke-width="1.5"
-                    data-region="Banda Aceh"/>
-              <circle cx="255" cy="90" r="5" fill="var(--accent-teal)" class="map-dot"/>
-              <text x="255" y="78" text-anchor="middle" fill="var(--text-secondary)" font-size="11" font-weight="600" font-family="Inter">Banda Aceh</text>
-
-              <!-- Lhokseumawe Region (Northeast) -->
-              <path id="region-lhokseumawe" class="map-region"
-                    d="M420,45 Q470,35 520,60 Q555,80 570,110 Q560,130 530,140 Q490,145 460,135 Q430,120 415,95 Q405,70 420,45 Z"
-                    fill="var(--bg-card)" stroke="rgba(255,255,255,0.15)" stroke-width="1.5"
-                    data-region="Lhokseumawe"/>
-              <circle cx="490" cy="90" r="5" fill="var(--accent-teal)" class="map-dot"/>
-              <text x="490" y="78" text-anchor="middle" fill="var(--text-secondary)" font-size="11" font-weight="600" font-family="Inter">Lhokseumawe</text>
-
-              <!-- Meulaboh Region (West coast) -->
-              <path id="region-meulaboh" class="map-region"
-                    d="M155,250 Q145,215 160,185 Q180,165 210,160 Q240,165 255,190 Q260,220 250,255 Q235,285 210,295 Q180,295 165,275 Q155,265 155,250 Z"
-                    fill="var(--bg-card)" stroke="rgba(255,255,255,0.15)" stroke-width="1.5"
-                    data-region="Meulaboh"/>
-              <circle cx="210" cy="225" r="5" fill="var(--accent-teal)" class="map-dot"/>
-              <text x="210" y="213" text-anchor="middle" fill="var(--text-secondary)" font-size="11" font-weight="600" font-family="Inter">Meulaboh</text>
-
-              <!-- Map Legend -->
-              <g transform="translate(560, 320)">
-                <rect x="0" y="0" width="180" height="100" rx="8" fill="rgba(15,23,42,0.7)" stroke="rgba(255,255,255,0.08)"/>
-                <text x="12" y="22" fill="var(--text-muted)" font-size="10" font-weight="600" font-family="Inter">STATUS ANOMALI</text>
-                <circle cx="22" cy="42" r="6" fill="#ef4444" filter="url(#glow-red)"/>
-                <text x="36" y="46" fill="var(--text-secondary)" font-size="10" font-family="Inter">Kritis (Z &gt; 3σ)</text>
-                <circle cx="22" cy="62" r="6" fill="#f59e0b" filter="url(#glow-yellow)"/>
-                <text x="36" y="66" fill="var(--text-secondary)" font-size="10" font-family="Inter">Waspada (Z &gt; 2σ)</text>
-                <circle cx="22" cy="82" r="6" fill="var(--accent-teal)"/>
-                <text x="36" y="86" fill="var(--text-secondary)" font-size="10" font-family="Inter">Normal</text>
-              </g>
-
-              <!-- SVG Filters for glow effects -->
-              <defs>
-                <filter id="glow-red" x="-50%" y="-50%" width="200%" height="200%">
-                  <feGaussianBlur stdDeviation="4" result="blur"/>
-                  <feComposite in="SourceGraphic" in2="blur" operator="over"/>
-                </filter>
-                <filter id="glow-yellow" x="-50%" y="-50%" width="200%" height="200%">
-                  <feGaussianBlur stdDeviation="3" result="blur"/>
-                  <feComposite in="SourceGraphic" in2="blur" operator="over"/>
-                </filter>
-              </defs>
-            </g>
-          </svg>
-          <div id="map-status-summary" style="text-align:center; margin-top: 8px; font-size: 12px; color: var(--text-muted);"></div>
+        <div class="glass-card" id="aceh-map-container" style="position: relative; padding: 0; overflow: hidden; border-radius: 12px; border: 1px solid var(--border-glass); background: #0b0f19;">
+          <!-- Real Interactive Leaflet GIS Map -->
+          <div id="aceh-leaflet-map" style="width: 100%; height: 380px; z-index: 1;"></div>
+          
+          <!-- Floating Legend (Premium UI Glassmorphism) -->
+          <div class="map-floating-legend" style="position: absolute; bottom: 16px; right: 16px; z-index: 1000; background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.08); padding: 12px 16px; border-radius: 10px; pointer-events: auto; width: 180px;">
+            <div style="color: var(--text-muted); font-size: 10px; font-weight: 700; margin-bottom: 8px; letter-spacing: 0.5px; font-family: 'Inter';">STATUS ANOMALI</div>
+            <div style="display: flex; align-items: center; gap: 8px; font-size: 11px; margin-bottom: 6px; font-family: 'Inter'; color: var(--text-secondary);">
+              <span class="legend-pulse critical" style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #ef4444; box-shadow: 0 0 8px #ef4444;"></span>
+              <span>Kritis (Z &gt; 3σ)</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 8px; font-size: 11px; margin-bottom: 6px; font-family: 'Inter'; color: var(--text-secondary);">
+              <span class="legend-pulse warning" style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #f59e0b; box-shadow: 0 0 8px #f59e0b;"></span>
+              <span>Waspada (Z &gt; 2σ)</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 8px; font-size: 11px; font-family: 'Inter'; color: var(--text-secondary);">
+              <span class="legend-pulse normal" style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #14b8a6; box-shadow: 0 0 8px #14b8a6;"></span>
+              <span>Normal</span>
+            </div>
+          </div>
         </div>
+        <div id="map-status-summary" style="text-align:center; margin-top: 10px; font-size: 12px; color: var(--text-muted);"></div>
       </section>
 
       <!-- ── Status Legend ─────────────────────────────────────── -->
