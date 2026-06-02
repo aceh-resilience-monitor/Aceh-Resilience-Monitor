@@ -12,17 +12,61 @@ let selectedCommodity = null;
 let activeCategory = 'all';
 let showForecast = false;
 let selectedRegion = 'aggregated';
+let spatialCommodity = 'Cabai Merah Keriting';
+let activeTab = 'tab-executive';
+
+// ── Tab Navigation (Modul E) ─────────────────────────────────────
+function switchTab(tabId) {
+  activeTab = tabId;
+  // Toggle tab buttons
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.tab === tabId);
+  });
+  // Toggle tab content
+  document.querySelectorAll('.tab-content').forEach(tc => {
+    tc.classList.toggle('active', tc.id === tabId);
+  });
+  // Resize Chart.js instances to prevent "gepeng" on hidden tabs
+  requestAnimationFrame(() => {
+    Object.values(charts).forEach(c => {
+      if (c && typeof c.resize === 'function') {
+        c.resize();
+      }
+    });
+  });
+  // Lazy-render tab content on first visit
+  if (tabId === 'tab-spatial' && !window._spatialRendered) {
+    window._spatialRendered = true;
+    renderSpatialTab();
+  }
+  if (tabId === 'tab-margin' && !window._marginRendered) {
+    window._marginRendered = true;
+    renderMarginHealthTab();
+  }
+  // Scroll to top
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function onSpatialCommodityChange(commodity) {
+  spatialCommodity = commodity;
+  renderRegionalAnalysis(commodity);
+  renderRegionalChart(commodity);
+}
 
 function changeRegion(region) {
   selectedRegion = region;
   renderCommodityGrid();
+  updateSVGMap();
   
   if (selectedCommodity) {
     showCommodityDetail(selectedCommodity);
-    renderRegionalAnalysis(selectedCommodity);
   } else {
     updatePriceTrendChart();
-    renderRegionalAnalysis('Cabai Merah Keriting');
+  }
+
+  // Re-render spatial tab if it was already rendered
+  if (window._spatialRendered) {
+    renderSpatialTab();
   }
 
   // Smooth scroll to Commodity Status Section
@@ -115,21 +159,30 @@ async function initApp() {
     return;
   }
 
+  // Tab 1 (Executive) — render immediately
   renderKPIs();
-  renderEarlyWarning();
   renderCommodityGrid();
-  renderPriceTrendChart();
-  renderYoYChart();
-  renderSeasonalityHeatmap();
-  renderVolatilityHeatmap();
   renderAlertFeed();
   renderAnomalyTable();
+  renderSeasonalityHeatmap();
+  renderVolatilityHeatmap();
+  updateSVGMap();
+
+  // Tab 4 (Forecast) — render chart instances
+  renderEarlyWarning();
+  renderPriceTrendChart();
+  renderYoYChart();
   renderCategoryAreaChart();
-  renderRegionalAnalysis('Cabai Merah Keriting');
+
+  // Populate spatial commodity dropdown
+  populateSpatialDropdown();
 
   // Update date display
   document.getElementById('data-date-range').textContent =
     `${DATA.kpi.dataStartDate} — ${DATA.kpi.dataEndDate}`;
+
+  // Default tab
+  switchTab('tab-executive');
 
   // Hide loading
   await delay(400);
@@ -445,9 +498,6 @@ function selectCommodity(commodity) {
 
   // Show detail panel
   showCommodityDetail(commodity);
-
-  // Update regional analysis
-  renderRegionalAnalysis(commodity);
 
   // Update price chart to show only this commodity
   updatePriceTrendChart(commodity);
@@ -1334,6 +1384,366 @@ function switchSection(sectionId) {
   const target = document.getElementById(sectionId);
   if (target) {
     target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════
+// MODUL G: Spatial Tab — Regional Chart + Arbitrage Advisor
+// ══════════════════════════════════════════════════════════════════
+
+function populateSpatialDropdown() {
+  const select = document.getElementById('spatial-commodity-select');
+  if (!select || !DATA.commodityCards) return;
+  select.innerHTML = DATA.commodityCards.map(c =>
+    `<option value="${c.commodity}" ${c.commodity === spatialCommodity ? 'selected' : ''}>${c.icon} ${c.shortName}</option>`
+  ).join('');
+}
+
+function renderSpatialTab() {
+  renderRegionalAnalysis(spatialCommodity);
+  renderRegionalChart(spatialCommodity);
+  renderArbitrageAdvisor();
+}
+
+function renderRegionalChart(commodity) {
+  const canvas = document.getElementById('chart-regional-comparison');
+  if (!canvas) return;
+
+  // Destroy previous instance
+  if (charts.regionalComparison) {
+    charts.regionalComparison.destroy();
+  }
+
+  const regionalData = DATA.regional[commodity] || {};
+  const regions = ['Banda Aceh', 'Lhokseumawe', 'Meulaboh'];
+  const regionColors = { 'Banda Aceh': '#3b82f6', 'Lhokseumawe': '#f59e0b', 'Meulaboh': '#10b981' };
+
+  const datasets = regions.map(r => {
+    const rData = regionalData[r];
+    if (!rData || !rData.dates || !rData.prices) return null;
+    return {
+      label: r,
+      data: rData.dates.map((d, i) => ({ x: d, y: rData.prices[i] })),
+      borderColor: regionColors[r],
+      backgroundColor: regionColors[r] + '15',
+      borderWidth: 2,
+      pointRadius: 0,
+      pointHoverRadius: 4,
+      fill: false,
+      tension: 0.3,
+    };
+  }).filter(Boolean);
+
+  charts.regionalComparison = new Chart(canvas.getContext('2d'), {
+    type: 'line',
+    data: { datasets },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: {
+          position: 'top',
+          labels: { color: '#94a3b8', font: { family: 'Inter', size: 11 }, usePointStyle: true, padding: 12 },
+        },
+        tooltip: {
+          backgroundColor: 'rgba(17, 24, 39, 0.95)',
+          titleColor: '#f1f5f9',
+          bodyColor: '#94a3b8',
+          borderColor: 'rgba(255,255,255,0.1)',
+          borderWidth: 1,
+          bodyFont: { family: 'JetBrains Mono', size: 12 },
+          callbacks: { label: (ctx) => `${ctx.dataset.label}: ${formatPrice(ctx.parsed.y)}` },
+        },
+      },
+      scales: {
+        x: {
+          type: 'time',
+          time: { unit: 'month', displayFormats: { month: 'MMM yy' } },
+          grid: { color: 'rgba(255,255,255,0.04)' },
+          ticks: { color: '#64748b', font: { size: 10 } },
+        },
+        y: {
+          grid: { color: 'rgba(255,255,255,0.04)' },
+          ticks: { color: '#64748b', font: { size: 10 }, callback: (v) => formatPriceShort(v) },
+        },
+      },
+    },
+  });
+}
+
+function renderArbitrageAdvisor() {
+  const container = document.getElementById('arbitrage-advisor-grid');
+  if (!container) return;
+
+  const regions = ['Banda Aceh', 'Lhokseumawe', 'Meulaboh'];
+  const opportunities = [];
+
+  // Scan ALL commodities for price disparity > 30%
+  (DATA.commodityCards || []).forEach(card => {
+    const regData = DATA.regional[card.commodity] || {};
+    const prices = {};
+    regions.forEach(r => {
+      if (regData[r] && regData[r].latestPrice > 0) {
+        prices[r] = regData[r].latestPrice;
+      }
+    });
+
+    const validRegions = Object.keys(prices);
+    if (validRegions.length < 2) return;
+
+    // Find max and min
+    let maxRegion = validRegions[0], minRegion = validRegions[0];
+    validRegions.forEach(r => {
+      if (prices[r] > prices[maxRegion]) maxRegion = r;
+      if (prices[r] < prices[minRegion]) minRegion = r;
+    });
+
+    const diff = prices[maxRegion] - prices[minRegion];
+    const diffPct = (diff / prices[minRegion]) * 100;
+
+    if (diffPct > 30) {
+      opportunities.push({
+        commodity: card.commodity,
+        shortName: card.shortName,
+        icon: card.icon,
+        maxRegion,
+        minRegion,
+        maxPrice: prices[maxRegion],
+        minPrice: prices[minRegion],
+        diffPct,
+        diffRupiah: diff,
+      });
+    }
+  });
+
+  // Sort by disparity descending
+  opportunities.sort((a, b) => b.diffPct - a.diffPct);
+
+  if (opportunities.length === 0) {
+    container.innerHTML = `
+      <div class="glass-card arbitrage-no-data">
+        <p style="font-size:28px; margin-bottom:12px;">✅</p>
+        <p style="font-size:16px; font-weight:600; color:var(--status-normal); margin-bottom:6px;">Tidak Ada Disparitas Ekstrem</p>
+        <p>Seluruh komoditas memiliki selisih harga antar daerah di bawah 30%. Distribusi berjalan baik.</p>
+      </div>`;
+    return;
+  }
+
+  container.innerHTML = `<div class="arbitrage-grid">` + opportunities.map(o => {
+    const isExtreme = o.diffPct > 60;
+    const cardClass = isExtreme ? 'extreme' : '';
+    const badgeColor = isExtreme ? 'var(--status-critical)' : 'var(--status-warning)';
+    const badgeBg = isExtreme ? 'rgba(239,68,68,0.15)' : 'rgba(245,158,11,0.15)';
+    const badgeText = isExtreme ? '🔴 KRITIS' : '🟡 DISPARITAS';
+
+    return `
+      <div class="arbitrage-card ${cardClass}">
+        <div class="arbitrage-header">
+          <span style="font-size:15px; font-weight:700;">${o.icon} ${o.shortName}</span>
+          <span class="arbitrage-badge" style="color:${badgeColor}; background:${badgeBg}; border:1px solid ${badgeColor}30;">${badgeText}</span>
+        </div>
+        <div style="display:flex; gap:12px; margin-bottom:8px;">
+          <div style="flex:1; text-align:center; padding:10px; background:rgba(239,68,68,0.06); border-radius:8px; border:1px solid rgba(239,68,68,0.1);">
+            <div style="font-size:9px; color:var(--text-muted); font-weight:700; text-transform:uppercase;">📍 ${o.maxRegion} (Termahal)</div>
+            <div style="font-size:15px; font-weight:700; color:var(--status-critical); font-family:'JetBrains Mono',monospace; margin-top:4px;">${formatPrice(o.maxPrice)}</div>
+          </div>
+          <div style="flex:1; text-align:center; padding:10px; background:rgba(34,197,94,0.06); border-radius:8px; border:1px solid rgba(34,197,94,0.1);">
+            <div style="font-size:9px; color:var(--text-muted); font-weight:700; text-transform:uppercase;">📍 ${o.minRegion} (Termurah)</div>
+            <div style="font-size:15px; font-weight:700; color:var(--status-normal); font-family:'JetBrains Mono',monospace; margin-top:4px;">${formatPrice(o.minPrice)}</div>
+          </div>
+        </div>
+        <div style="text-align:center; font-size:18px; font-weight:800; color:${badgeColor}; margin:8px 0;">
+          Selisih: +${o.diffPct.toFixed(1)}% (${formatPrice(o.diffRupiah)})
+        </div>
+        <div class="arbitrage-recommendation">
+          <strong>💡 REKOMENDASI ARBITRASE:</strong><br>
+          Harga ${o.shortName} di ${o.maxRegion} (${formatPrice(o.maxPrice)}) jauh lebih tinggi dibanding ${o.minRegion} (${formatPrice(o.minPrice)}). Selisih: +${o.diffPct.toFixed(1)}%.<br>
+          <strong>⚡ Aksi:</strong> Mobilisasi stok dari ${o.minRegion} ke ${o.maxRegion} untuk menekan disparitas harga.
+        </div>
+      </div>`;
+  }).join('') + `</div>`;
+}
+
+// ══════════════════════════════════════════════════════════════════
+// MODUL H: Margin Health Tab — Supply Chain for ALL commodities
+// ══════════════════════════════════════════════════════════════════
+
+function renderMarginHealthTab() {
+  const summaryContainer = document.getElementById('margin-summary-cards');
+  const gridContainer = document.getElementById('margin-health-grid');
+  if (!summaryContainer || !gridContainer) return;
+
+  let healthy = 0, warning = 0, danger = 0;
+  const cards = [];
+
+  (DATA.commodityCards || []).forEach(card => {
+    const src = DATA.priceBySource[card.commodity] || {};
+    const prodPrice = src['Produsen'] ? src['Produsen'].latestPrice : null;
+    const bigPrice = src['Pedagang Besar'] ? src['Pedagang Besar'].latestPrice : null;
+    const tradPrice = src['Pasar Tradisional'] ? src['Pasar Tradisional'].latestPrice : null;
+    const modPrice = src['Pasar Modern'] ? src['Pasar Modern'].latestPrice : null;
+
+    const hasProd = prodPrice && prodPrice > 0;
+    const hasBig = bigPrice && bigPrice > 0;
+    const hasTrad = tradPrice && tradPrice > 0;
+    const hasMod = modPrice && modPrice > 0;
+
+    let totalMarkup = null;
+    let healthStatus = 'no-data';
+    let markup1 = null, markup2 = null, markup3 = null;
+
+    if (hasProd && hasBig) markup1 = ((bigPrice - prodPrice) / prodPrice * 100);
+    if (hasBig && hasTrad) markup2 = ((tradPrice - bigPrice) / bigPrice * 100);
+    if (hasTrad && hasMod) markup3 = ((modPrice - tradPrice) / tradPrice * 100);
+
+    // Total margin: Produsen → endpoint terjauh yang tersedia
+    const endPrice = hasMod ? modPrice : hasTrad ? tradPrice : null;
+    if (hasProd && endPrice) {
+      totalMarkup = ((endPrice - prodPrice) / prodPrice * 100);
+      if (totalMarkup > 40) { healthStatus = 'danger'; danger++; }
+      else if (totalMarkup > 20) { healthStatus = 'warning'; warning++; }
+      else { healthStatus = 'good'; healthy++; }
+    }
+
+    cards.push({ ...card, prodPrice, bigPrice, tradPrice, modPrice, hasProd, hasBig, hasTrad, hasMod, totalMarkup, healthStatus, markup1, markup2, markup3 });
+  });
+
+  // Sort: danger first
+  const order = { danger: 0, warning: 1, good: 2, 'no-data': 3 };
+  cards.sort((a, b) => (order[a.healthStatus] ?? 3) - (order[b.healthStatus] ?? 3));
+
+  // Summary KPI cards
+  summaryContainer.innerHTML = `
+    <div class="kpi-card green">
+      <div class="kpi-label">Rantai Pasok Sehat</div>
+      <div class="kpi-value green">${healthy}</div>
+      <div class="kpi-detail">Markup &lt;20% — distribusi efisien</div>
+    </div>
+    <div class="kpi-card yellow">
+      <div class="kpi-label">Perlu Perhatian</div>
+      <div class="kpi-value yellow">${warning}</div>
+      <div class="kpi-detail">Markup 20-40% — inefisiensi distribusi</div>
+    </div>
+    <div class="kpi-card red">
+      <div class="kpi-label">Tidak Wajar</div>
+      <div class="kpi-value red">${danger}</div>
+      <div class="kpi-detail">Markup &gt;40% — potensi penimbunan</div>
+    </div>`;
+
+  // Helper to build a single node row
+  function nodeRow(icon, label, price, hasData, color) {
+    return `
+      <div class="margin-flow-node">
+        <div class="margin-flow-node-info">
+          <span class="margin-flow-node-icon">${icon}</span>
+          <span class="margin-flow-node-label">${label}</span>
+        </div>
+        <span class="margin-flow-node-price" style="color:${hasData ? color : '#64748b'}">${hasData ? formatPrice(price) : '—'}</span>
+      </div>`;
+  }
+
+  function connectorRow(markup, color) {
+    const pctText = markup !== null ? (markup >= 0 ? '+' : '') + markup.toFixed(1) + '%' : '—';
+    return `
+      <div class="margin-flow-connector">
+        <div class="margin-flow-connector-line"></div>
+        <span class="margin-flow-connector-pct" style="color:${color}; background:${color}15; border:1px solid ${color}30;">↓ ${pctText}</span>
+      </div>`;
+  }
+
+  // Margin cards grid
+  gridContainer.innerHTML = cards.map(c => {
+    const healthClass = c.healthStatus === 'good' ? 'health-good' : c.healthStatus === 'warning' ? 'health-warning' : c.healthStatus === 'danger' ? 'health-danger' : '';
+    const badgeClass = c.healthStatus === 'good' ? 'good' : c.healthStatus === 'warning' ? 'warning' : c.healthStatus === 'danger' ? 'danger' : '';
+    const badgeText = c.healthStatus === 'good' ? '🟢 Sehat' : c.healthStatus === 'warning' ? '🟡 Waspada' : c.healthStatus === 'danger' ? '🔴 Tidak Wajar' : '⚪ Belum Ada Data';
+
+    const m1Color = c.markup1 !== null ? (c.markup1 > 20 ? '#ef4444' : c.markup1 > 10 ? '#f59e0b' : '#3b82f6') : '#64748b';
+    const m2Color = c.markup2 !== null ? (c.markup2 > 20 ? '#ef4444' : c.markup2 > 10 ? '#f59e0b' : '#3b82f6') : '#64748b';
+    const m3Color = c.markup3 !== null ? (c.markup3 > 20 ? '#ef4444' : c.markup3 > 10 ? '#f59e0b' : '#3b82f6') : '#64748b';
+
+    return `
+      <div class="margin-card ${healthClass}">
+        <div class="margin-card-header">
+          <div class="margin-card-title">${c.icon} ${c.shortName}</div>
+          <span class="health-badge ${badgeClass}">${badgeText}</span>
+        </div>
+        <div class="margin-flow">
+          ${nodeRow('🌾', 'Produsen', c.prodPrice, c.hasProd, '#10b981')}
+          ${connectorRow(c.markup1, m1Color)}
+          ${nodeRow('🏢', 'Pedagang Besar', c.bigPrice, c.hasBig, '#14b8a6')}
+          ${connectorRow(c.markup2, m2Color)}
+          ${nodeRow('🧺', 'Pasar Tradisional', c.tradPrice, c.hasTrad, '#f59e0b')}
+          ${connectorRow(c.markup3, m3Color)}
+          ${nodeRow('🛒', 'Pasar Modern', c.modPrice, c.hasMod, '#ec4899')}
+        </div>
+        ${c.totalMarkup !== null ? `
+          <div style="margin-top:12px; text-align:center; font-size:13px; color:var(--text-secondary);">
+            Total Margin Produsen → Konsumen: <strong style="color:${c.healthStatus === 'danger' ? '#ef4444' : c.healthStatus === 'warning' ? '#f59e0b' : '#10b981'}; font-size:16px;">+${c.totalMarkup.toFixed(1)}%</strong>
+          </div>` : ''}
+        ${c.healthStatus === 'danger' ? `
+          <div class="margin-warning-text">
+            🚨 Potensi penimbunan/spekulasi — Perlu investigasi Satgas Pangan
+          </div>` : ''}
+      </div>`;
+  }).join('');
+}
+
+// ══════════════════════════════════════════════════════════════════
+// MODUL I: SVG Map Aceh — Update glow based on anomalies
+// ══════════════════════════════════════════════════════════════════
+
+function updateSVGMap() {
+  if (!DATA || !DATA.anomalies) return;
+
+  const regionMapping = {
+    'Banda Aceh': 'region-banda-aceh',
+    'Lhokseumawe': 'region-lhokseumawe',
+    'Meulaboh': 'region-meulaboh',
+  };
+
+  // Aggregate anomaly severity per region from recent anomalies
+  const regionStatus = { 'Banda Aceh': 'normal', 'Lhokseumawe': 'normal', 'Meulaboh': 'normal' };
+
+  // Check recent anomalies (last 30 days) for each region
+  const recentAnomalies = DATA.anomalies.slice(0, 100);
+  recentAnomalies.forEach(a => {
+    if (a.daerah && regionStatus[a.daerah] !== undefined) {
+      if (a.z_score > 3) regionStatus[a.daerah] = 'critical';
+      else if (a.z_score > 2 && regionStatus[a.daerah] !== 'critical') regionStatus[a.daerah] = 'warning';
+    }
+  });
+
+  // Also check alertFeed for regional anomalies
+  (DATA.alertFeed || []).forEach(a => {
+    if (a.daerah && regionStatus[a.daerah] !== undefined && a.severity !== 'prediction') {
+      if (a.severity === 'critical') regionStatus[a.daerah] = 'critical';
+      else if (a.severity === 'warning' && regionStatus[a.daerah] !== 'critical') regionStatus[a.daerah] = 'warning';
+    }
+  });
+
+  // Apply CSS classes
+  Object.entries(regionMapping).forEach(([region, svgId]) => {
+    const el = document.getElementById(svgId);
+    if (!el) return;
+    el.classList.remove('glow-anomaly-red', 'glow-anomaly-yellow', 'glow-normal');
+    if (regionStatus[region] === 'critical') el.classList.add('glow-anomaly-red');
+    else if (regionStatus[region] === 'warning') el.classList.add('glow-anomaly-yellow');
+    else el.classList.add('glow-normal');
+  });
+
+  // Update summary text
+  const summaryEl = document.getElementById('map-status-summary');
+  if (summaryEl) {
+    const critical = Object.values(regionStatus).filter(s => s === 'critical').length;
+    const warn = Object.values(regionStatus).filter(s => s === 'warning').length;
+    const normal = Object.values(regionStatus).filter(s => s === 'normal').length;
+    summaryEl.innerHTML = `
+      <span style="color:var(--status-critical); font-weight:600;">${critical} Kritis</span> · 
+      <span style="color:var(--status-warning); font-weight:600;">${warn} Waspada</span> · 
+      <span style="color:var(--status-normal); font-weight:600;">${normal} Normal</span>
+      <span style="margin-left:8px; color:var(--text-muted);">— Update otomatis berdasarkan data anomali terbaru</span>
+    `;
   }
 }
 
