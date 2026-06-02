@@ -4,6 +4,8 @@ ARM Configuration — Single Source of Truth
 All constants, mappings, paths, and thresholds used across the ARM project.
 Every other module imports from here. No duplication allowed.
 
+Author: Aulia (ML & Azure)
+
 Usage:
     from scripts.config import CATEGORY_MAP, SHORT_NAMES, setup_logging
 """

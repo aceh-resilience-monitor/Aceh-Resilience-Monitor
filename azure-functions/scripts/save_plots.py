@@ -4,6 +4,8 @@ ARM Plot Generator
 Generate and save all EDA plots from the commodity price dataset.
 Imports constants from config and data loading from etl — zero duplication.
 
+Author: Aulia (ML & Azure)
+
 Run from project root:
     python -m scripts.save_plots
 """

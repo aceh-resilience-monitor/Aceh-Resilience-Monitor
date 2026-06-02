@@ -1,6 +1,8 @@
 /**
  * Aceh Resilience Monitor (ARM) — Dashboard Application
  * Interactive commodity price monitoring & anomaly detection
+ * 
+ * Author: Ilhaam (Code & Frontend)
  */
 
 // ── Globals ──────────────────────────────────────────────────────

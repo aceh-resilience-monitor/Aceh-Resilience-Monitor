@@ -4,6 +4,8 @@ ARM Anomaly Detection Module
 Z-Score based anomaly detection for commodity prices.
 Supports both historical anomaly detection and future spike prediction.
 
+Author: Aulia (ML & Azure)
+
 Key functions:
     classify_severity()      — Map Z-Score to severity level
     detect_anomalies()       — Find price anomalies in historical data

@@ -1,5 +1,7 @@
 """
 Tests for scripts/scraper.py — Scraper and API parsing validation.
+
+Author: Arief (Test, Docs & Comms)
 """
 
 import pytest

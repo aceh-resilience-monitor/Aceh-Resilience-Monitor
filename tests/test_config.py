@@ -1,5 +1,7 @@
 """
 Tests for scripts/config.py — Constants integrity validation.
+
+Author: Arief (Test, Docs & Comms)
 """
 
 from scripts.config import (

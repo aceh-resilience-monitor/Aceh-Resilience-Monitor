@@ -4,7 +4,7 @@ ARM Scraper — Daily PIHPS Data Scraping in Python
 Scrapes daily commodity price data from the Bank Indonesia hargapangan API.
 Ports the Node.js scraping logic from dataup/helper.js and dataup/daily_update.js.
 
-Author: AI Agent
+Author: Ilhaam (Code & Frontend) & Aulia (ML & Azure)
 """
 
 import sys

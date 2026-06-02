@@ -1,5 +1,7 @@
 """
 Tests for scripts/anomaly.py — Z-Score anomaly detection.
+
+Author: Arief (Test, Docs & Comms)
 """
 
 import pytest

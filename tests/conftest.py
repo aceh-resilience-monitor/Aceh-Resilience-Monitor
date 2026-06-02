@@ -1,5 +1,7 @@
 """
 Shared test fixtures for the ARM test suite.
+
+Author: Arief (Test, Docs & Comms)
 """
 
 import pandas as pd

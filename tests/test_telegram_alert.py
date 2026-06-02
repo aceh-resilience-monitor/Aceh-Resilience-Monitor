@@ -1,5 +1,7 @@
 """
 Tests for scripts/telegram_alert.py — Telegram Notification validation.
+
+Author: Arief (Test, Docs & Comms)
 """
 
 import pytest

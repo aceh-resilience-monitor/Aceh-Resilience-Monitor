@@ -8,6 +8,8 @@ This is a slim orchestrator that delegates all logic to modules:
     anomaly.py  → Z-Score anomaly detection
     forecast.py → Prophet time series forecasting
 
+Author: Aulia (ML & Azure)
+
 Run from project root:
     python -m scripts.prepare_dashboard_data
 """
