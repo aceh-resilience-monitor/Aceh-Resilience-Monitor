@@ -33,9 +33,10 @@ import numpy as np
 import pandas as pd
 
 # ── Setup path for importing ARM modules ──
-# Azure Functions runs from the azure-functions/ directory,
-# so we need to add the parent directory to sys.path
-root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+current_dir = os.path.dirname(os.path.abspath(__file__))
+root_dir = os.path.dirname(current_dir)
+if current_dir not in sys.path:
+    sys.path.insert(0, current_dir)
 if root_dir not in sys.path:
     sys.path.insert(0, root_dir)
 
@@ -50,6 +51,7 @@ from scripts.etl import add_holiday_features
 from scripts.anomaly import detect_anomalies, detect_future_spikes
 from scripts.forecast import forecast_all_commodities
 from scripts.telegram_alert import send_daily_alert
+from scripts.scraper import scrape_daily_pihps
 
 logger = logging.getLogger(__name__)
 
@@ -93,6 +95,8 @@ def _download_blob_json(container: str, blob_name: str) -> list:
 
 def _upload_blob_json(container: str, blob_name: str, data, content_type='application/json'):
     """Upload JSON data to Blob Storage."""
+    from azure.storage.blob import ContentSettings
+
     blob_service = _get_blob_service()
     blob_client = blob_service.get_blob_client(container, blob_name)
 
@@ -104,9 +108,34 @@ def _upload_blob_json(container: str, blob_name: str, data, content_type='applic
     blob_client.upload_blob(
         content.encode('utf-8'),
         overwrite=True,
-        content_settings={"content_type": content_type}
+        content_settings=ContentSettings(content_type=content_type)
     )
     logger.info("Uploaded %s/%s (%d bytes)", container, blob_name, len(content))
+
+
+def update_blob_with_new_data(container: str, blob_name: str) -> int:
+    """
+    Download f"{year}.json" from Blob Storage, run scrape_daily_pihps,
+    append any new records, and upload it back.
+    Returns the number of new records added.
+    """
+    logger.info("Downloading existing records from Blob: %s/%s", container, blob_name)
+    existing_records = _download_blob_json(container, blob_name)
+    
+    # Run the daily PIHPS scraper
+    new_records = scrape_daily_pihps(existing_records)
+    
+    if new_records:
+        updated_records = existing_records + new_records
+        # Sort by date (tanggal) chronologically
+        updated_records.sort(key=lambda x: x.get('tanggal', ''))
+        
+        logger.info("Uploading updated records to Blob: %s/%s", container, blob_name)
+        _upload_blob_json(container, blob_name, updated_records)
+        return len(new_records)
+        
+    logger.info("No new records to append to blob.")
+    return 0
 
 
 # ══════════════════════════════════════════════════════════════════════
@@ -291,6 +320,7 @@ def arm_daily_pipeline(timer: func.TimerRequest) -> None:
     ARM Daily Pipeline — runs every morning at 08:00 WIB.
 
     Pipeline steps:
+    0. Scrape today's data from PIHPS and update Blob Storage (Opsi A) (BARU)
     1. Load all historical data from Blob Storage (Opsi A: per-year files)
     2. Run Z-Score anomaly detection (reactive alerts)
     3. Run Prophet forecasting with Meugang regressors (84 models)
@@ -308,6 +338,17 @@ def arm_daily_pipeline(timer: func.TimerRequest) -> None:
     logger.info("═" * 60)
 
     try:
+        # ── Step 0: Scrape hari ini (BARU) ──
+        logger.info("Step 0/7: Scraping today's data from PIHPS...")
+        raw_container = os.environ.get('ARM_BLOB_CONTAINER', 'arm-raw-data')
+        current_year = datetime.now().year
+        blob_name = f"{current_year}.json"
+        try:
+            new_records_count = update_blob_with_new_data(raw_container, blob_name)
+            logger.info("Step 0 Complete: Added %d new records to Blob.", new_records_count)
+        except Exception as e:
+            logger.error("Step 0 Failed (Scraper error, continuing to Step 1): %s", e)
+
         # ── Step 1: Load Data from Blob Storage ──
         logger.info("Step 1/7: Loading data from Blob Storage...")
         df = load_all_data_from_blob()
@@ -322,10 +363,11 @@ def arm_daily_pipeline(timer: func.TimerRequest) -> None:
 
         # ── Step 2: Z-Score Anomaly Detection ──
         logger.info("Step 2/7: Running anomaly detection...")
-        # Aggregate to provincial level for anomaly detection
+        # Aggregate to regional level (kabupaten/kota) for Z-Score, and provincial level for latest prices
         from scripts.etl import aggregate_prices
         df_prov = aggregate_prices(df, by='province')
-        anomalies = detect_anomalies(df_prov, commodities)
+        df_region = aggregate_prices(df, by='region')
+        anomalies = detect_anomalies(df_region, commodities, group_by='daerah')
         logger.info("Anomalies detected: %d", len(anomalies))
 
         # ── Step 3: Prophet Forecasting with Meugang Regressors ──
