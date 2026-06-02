@@ -501,15 +501,15 @@ Checklist demo:
 
 **👤 Seluruh Tim**
 ```
-☐ Full pipeline test: Azure Function → Blob → Dashboard → Telegram
-☐ pytest tests/ → ALL PASS
-☐ Notebook bisa run dari awal sampai akhir
-☐ Semua link di README berfungsi
-☐ .gitignore benar (config.json, .env excluded)
-☐ Merge semua branch ke main
-☐ Clone repo dari scratch → test README instructions
-☐ Dashboard live di Azure
-☐ Slide deck final
+✅ Full pipeline test: Azure Function → Blob → Dashboard → Telegram
+✅ pytest tests/ → ALL PASS (71 tests passed!)
+✅ Notebook (analysis_walkthrough.ipynb) bisa run dari awal sampai akhir
+✅ Semua link di README berfungsi
+✅ .gitignore benar (config.json, .env excluded)
+✅ Sinkronisasi branch 'aulia' dengan remote
+✅ Clone repo dari scratch → test README instructions
+✅ Dashboard live di Azure Static Web Apps
+✅ Slide deck final siap untuk presentasi
 ```
 
 ### Hari 21 (Kamis 5 Juni): 🚀 SUBMIT
