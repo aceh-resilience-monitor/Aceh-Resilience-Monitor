@@ -1589,24 +1589,28 @@ function renderMarginHealthTab() {
     const hasTrad = tradPrice && tradPrice > 0;
     const hasMod = modPrice && modPrice > 0;
 
-    let totalMarkup = null;
     let healthStatus = 'no-data';
-    let markup1 = null, markup2 = null, markup3 = null;
+    let markup1 = null;   // Produsen → Pedagang Besar
+    let markup2 = null;   // Pedagang Besar → Pasar Tradisional
+    let markup3 = null;   // Pedagang Besar → Pasar Modern (SETINGKAT dengan markup2!)
+    let totalTrad = null;  // Produsen → Pasar Tradisional (jalur tradisional)
+    let totalMod = null;   // Produsen → Pasar Modern (jalur modern)
 
     if (hasProd && hasBig) markup1 = ((bigPrice - prodPrice) / prodPrice * 100);
     if (hasBig && hasTrad) markup2 = ((tradPrice - bigPrice) / bigPrice * 100);
-    if (hasTrad && hasMod) markup3 = ((modPrice - tradPrice) / tradPrice * 100);
+    if (hasBig && hasMod)  markup3 = ((modPrice - bigPrice) / bigPrice * 100);
+    if (hasProd && hasTrad) totalTrad = ((tradPrice - prodPrice) / prodPrice * 100);
+    if (hasProd && hasMod)  totalMod = ((modPrice - prodPrice) / prodPrice * 100);
 
-    // Total margin: Produsen → endpoint terjauh yang tersedia
-    const endPrice = hasMod ? modPrice : hasTrad ? tradPrice : null;
-    if (hasProd && endPrice) {
-      totalMarkup = ((endPrice - prodPrice) / prodPrice * 100);
-      if (totalMarkup > 40) { healthStatus = 'danger'; danger++; }
-      else if (totalMarkup > 20) { healthStatus = 'warning'; warning++; }
+    // Health status: gunakan margin TERBURUK (max) dari kedua jalur
+    const maxTotal = Math.max(totalTrad || 0, totalMod || 0);
+    if (totalTrad !== null || totalMod !== null) {
+      if (maxTotal > 40) { healthStatus = 'danger'; danger++; }
+      else if (maxTotal > 20) { healthStatus = 'warning'; warning++; }
       else { healthStatus = 'good'; healthy++; }
     }
 
-    cards.push({ ...card, prodPrice, bigPrice, tradPrice, modPrice, hasProd, hasBig, hasTrad, hasMod, totalMarkup, healthStatus, markup1, markup2, markup3 });
+    cards.push({ ...card, prodPrice, bigPrice, tradPrice, modPrice, hasProd, hasBig, hasTrad, hasMod, healthStatus, markup1, markup2, markup3, totalTrad, totalMod, maxTotal });
   });
 
   // Sort: danger first
@@ -1631,56 +1635,103 @@ function renderMarginHealthTab() {
       <div class="kpi-detail">Markup &gt;40% — potensi penimbunan</div>
     </div>`;
 
-  // Helper to build a single node row
-  function nodeRow(icon, label, price, hasData, color) {
-    return `
-      <div class="margin-flow-node">
-        <div class="margin-flow-node-info">
-          <span class="margin-flow-node-icon">${icon}</span>
-          <span class="margin-flow-node-label">${label}</span>
-        </div>
-        <span class="margin-flow-node-price" style="color:${hasData ? color : '#64748b'}">${hasData ? formatPrice(price) : '—'}</span>
-      </div>`;
+  // Color helper
+  function mColor(val) {
+    if (val === null) return '#64748b';
+    return val > 20 ? '#ef4444' : val > 10 ? '#f59e0b' : '#3b82f6';
   }
-
-  function connectorRow(markup, color) {
-    const pctText = markup !== null ? (markup >= 0 ? '+' : '') + markup.toFixed(1) + '%' : '—';
-    return `
-      <div class="margin-flow-connector">
-        <div class="margin-flow-connector-line"></div>
-        <span class="margin-flow-connector-pct" style="color:${color}; background:${color}15; border:1px solid ${color}30;">↓ ${pctText}</span>
-      </div>`;
+  function mkBadge(val, color) {
+    const txt = val !== null ? (val >= 0 ? '+' : '') + val.toFixed(1) + '%' : '—';
+    return `<span class="margin-tl-badge" style="color:${color}; background:${color}15; border:1px solid ${color}30;">${txt}</span>`;
+  }
+  function statusColor(val) {
+    if (val === null) return '#64748b';
+    return val > 40 ? '#ef4444' : val > 20 ? '#f59e0b' : '#10b981';
+  }
+  function barWidth(val) {
+    if (val === null || val <= 0) return 0;
+    return Math.min(val / 100 * 100, 100);  // cap at 100%
   }
 
   // Margin cards grid
   gridContainer.innerHTML = cards.map(c => {
     const healthClass = c.healthStatus === 'good' ? 'health-good' : c.healthStatus === 'warning' ? 'health-warning' : c.healthStatus === 'danger' ? 'health-danger' : '';
     const badgeClass = c.healthStatus === 'good' ? 'good' : c.healthStatus === 'warning' ? 'warning' : c.healthStatus === 'danger' ? 'danger' : '';
-    const badgeText = c.healthStatus === 'good' ? '🟢 Sehat' : c.healthStatus === 'warning' ? '🟡 Waspada' : c.healthStatus === 'danger' ? '🔴 Tidak Wajar' : '⚪ Belum Ada Data';
+    const badgeLabel = c.healthStatus === 'good' ? 'SEHAT' : c.healthStatus === 'warning' ? 'WASPADA' : c.healthStatus === 'danger' ? 'TIDAK WAJAR' : 'NO DATA';
 
-    const m1Color = c.markup1 !== null ? (c.markup1 > 20 ? '#ef4444' : c.markup1 > 10 ? '#f59e0b' : '#3b82f6') : '#64748b';
-    const m2Color = c.markup2 !== null ? (c.markup2 > 20 ? '#ef4444' : c.markup2 > 10 ? '#f59e0b' : '#3b82f6') : '#64748b';
-    const m3Color = c.markup3 !== null ? (c.markup3 > 20 ? '#ef4444' : c.markup3 > 10 ? '#f59e0b' : '#3b82f6') : '#64748b';
+    const m1c = mColor(c.markup1);
+    const m2c = mColor(c.markup2);
+    const m3c = mColor(c.markup3);
+
+    // Summary footer with severity bars
+    let footerHtml = '';
+    if (c.totalTrad !== null || c.totalMod !== null) {
+      const tradColor = statusColor(c.totalTrad);
+      const modColor = statusColor(c.totalMod);
+      footerHtml = `
+        <div class="margin-summary-footer">
+          <div class="margin-summary-channel">
+            <div class="margin-summary-channel-label">Jalur Tradisional</div>
+            <div class="margin-summary-channel-value" style="color:${tradColor}">${c.totalTrad !== null ? '+' + c.totalTrad.toFixed(1) + '%' : '—'}</div>
+            <div class="margin-severity-bar">
+              <div class="margin-severity-fill" style="width:${barWidth(c.totalTrad)}%; background:${tradColor};"></div>
+            </div>
+          </div>
+          <div class="margin-summary-channel">
+            <div class="margin-summary-channel-label">Jalur Modern</div>
+            <div class="margin-summary-channel-value" style="color:${modColor}">${c.totalMod !== null ? '+' + c.totalMod.toFixed(1) + '%' : '—'}</div>
+            <div class="margin-severity-bar">
+              <div class="margin-severity-fill" style="width:${barWidth(c.totalMod)}%; background:${modColor};"></div>
+            </div>
+          </div>
+        </div>`;
+    }
 
     return `
       <div class="margin-card ${healthClass}">
         <div class="margin-card-header">
           <div class="margin-card-title">${c.icon} ${c.shortName}</div>
-          <span class="health-badge ${badgeClass}">${badgeText}</span>
+          <span class="health-badge ${badgeClass}">${badgeLabel}</span>
         </div>
-        <div class="margin-flow">
-          ${nodeRow('🌾', 'Produsen', c.prodPrice, c.hasProd, '#10b981')}
-          ${connectorRow(c.markup1, m1Color)}
-          ${nodeRow('🏢', 'Pedagang Besar', c.bigPrice, c.hasBig, '#14b8a6')}
-          ${connectorRow(c.markup2, m2Color)}
-          ${nodeRow('🧺', 'Pasar Tradisional', c.tradPrice, c.hasTrad, '#f59e0b')}
-          ${connectorRow(c.markup3, m3Color)}
-          ${nodeRow('🛒', 'Pasar Modern', c.modPrice, c.hasMod, '#ec4899')}
+
+        <div class="margin-timeline">
+          <!-- Node: Produsen -->
+          <div class="margin-tl-node level-produsen">
+            <span class="margin-tl-label">Produsen</span>
+            <span class="margin-tl-price" style="color:${c.hasProd ? '#10b981' : '#64748b'}">${c.hasProd ? formatPrice(c.prodPrice) : '—'}</span>
+          </div>
+
+          <!-- Connector -->
+          <div class="margin-tl-connector">
+            ${mkBadge(c.markup1, m1c)}
+          </div>
+
+          <!-- Node: Pedagang Besar -->
+          <div class="margin-tl-node level-pedagang">
+            <span class="margin-tl-label">Pedagang Besar</span>
+            <span class="margin-tl-price" style="color:${c.hasBig ? '#14b8a6' : '#64748b'}">${c.hasBig ? formatPrice(c.bigPrice) : '—'}</span>
+          </div>
+
+          <!-- Fork: two retail channels side-by-side -->
+          <div class="margin-fork-wrapper">
+            <div class="margin-fork-label">Distribusi Retail</div>
+            <div class="margin-fork-grid">
+              <div class="margin-fork-panel panel-trad">
+                <div class="margin-fork-panel-label">Pasar Tradisional</div>
+                <div class="margin-fork-panel-price" style="color:${c.hasTrad ? '#f59e0b' : '#64748b'}">${c.hasTrad ? formatPrice(c.tradPrice) : '—'}</div>
+                <div class="margin-fork-panel-markup" style="color:${m2c}; background:${m2c}15; border:1px solid ${m2c}30;">${c.markup2 !== null ? (c.markup2 >= 0 ? '+' : '') + c.markup2.toFixed(1) + '%' : '—'}</div>
+              </div>
+              <div class="margin-fork-panel panel-mod">
+                <div class="margin-fork-panel-label">Pasar Modern</div>
+                <div class="margin-fork-panel-price" style="color:${c.hasMod ? '#ec4899' : '#64748b'}">${c.hasMod ? formatPrice(c.modPrice) : '—'}</div>
+                <div class="margin-fork-panel-markup" style="color:${m3c}; background:${m3c}15; border:1px solid ${m3c}30;">${c.markup3 !== null ? (c.markup3 >= 0 ? '+' : '') + c.markup3.toFixed(1) + '%' : '—'}</div>
+              </div>
+            </div>
+          </div>
         </div>
-        ${c.totalMarkup !== null ? `
-          <div style="margin-top:12px; text-align:center; font-size:13px; color:var(--text-secondary);">
-            Total Margin Produsen → Konsumen: <strong style="color:${c.healthStatus === 'danger' ? '#ef4444' : c.healthStatus === 'warning' ? '#f59e0b' : '#10b981'}; font-size:16px;">+${c.totalMarkup.toFixed(1)}%</strong>
-          </div>` : ''}
+
+        ${footerHtml}
+
         ${c.healthStatus === 'danger' ? `
           <div class="margin-warning-text">
             🚨 Potensi penimbunan/spekulasi — Perlu investigasi Satgas Pangan
