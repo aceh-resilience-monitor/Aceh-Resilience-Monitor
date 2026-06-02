@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 
 def generate_key(item: dict) -> str:
     """Generate a unique composite key for deduplication."""
-    return f"{item.get('tanggal')}|{item.get('komoditas')}|{item.get('daerah')}|{item.get('sumber')}"
+    return f"{item.get('tanggal')}|{item.get('name')}|{item.get('daerah')}|{item.get('sumber')}"
 
 def fetch_data_from_api(date_str: str, regency_id: int, price_type_id: int, retries: int = 3) -> List[dict]:
     """

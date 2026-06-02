@@ -18,11 +18,11 @@ class TestScraperUnit:
     def test_generate_key(self):
         item = {
             "tanggal": "2026-06-02",
-            "komoditas": "Beras",
+            "name": "Beras Kualitas Bawah I",
             "daerah": "Banda Aceh",
             "sumber": "Pasar Tradisional"
         }
-        assert generate_key(item) == "2026-06-02|Beras|Banda Aceh|Pasar Tradisional"
+        assert generate_key(item) == "2026-06-02|Beras Kualitas Bawah I|Banda Aceh|Pasar Tradisional"
 
     def test_process_api_data_success(self):
         api_data = [
