@@ -155,14 +155,14 @@
    - Azure Portal → `arm-daily-pipeline-74220` → Functions → `arm_daily_pipeline` → Code + Test → Run
 2. Monitor logs di Application Insights / Log Stream
 3. Checklist verifikasi:
-   - [ ] Step 0: Scraper berhasil fetch data hari ini
-   - [ ] Step 1: Data dari Blob loaded (termasuk data baru)
-   - [ ] Step 2: Anomali terdeteksi
-   - [ ] Step 3: 84 model Prophet trained
-   - [ ] Step 4: EWS spike predicted
-   - [ ] Step 5: Telegram alert **terkirim ke group** ✉️
-   - [ ] Step 6: `dashboard_data.json` ter-upload ke `$web`
-   - [ ] Step 7: MLflow metrics logged
+   - [x] Step 0: Scraper berhasil fetch data hari ini
+   - [x] Step 1: Data dari Blob loaded (termasuk data baru)
+   - [x] Step 2: Anomali terdeteksi
+   - [x] Step 3: 84 model Prophet trained
+   - [x] Step 4: EWS spike predicted
+   - [x] Step 5: Telegram alert **terkirim ke group** ✉️
+   - [x] Step 6: `dashboard_data.json` ter-upload ke `$web`
+   - [x] Step 7: MLflow metrics logged
 4. Ambil screenshot untuk dokumentasi
 
 **Output Modul D:** Pipeline terbukti berjalan end-to-end di cloud. Telegram alert terkirim. Data terbaru.
@@ -366,10 +366,10 @@ Jadi overhaul utamanya adalah **restrukturisasi layout ke 4 tab** + tambah fitur
 **Checklist Final:**
 
 #### Pipeline Azure (Backend)
-- [ ] Trigger `arm-daily-pipeline-74220` → pipeline berjalan tanpa error
-- [ ] Step 0: Data hari ini ter-scrape dan ter-append ke Blob
-- [ ] Step 5: Telegram alert terkirim ke group
-- [ ] Step 6: `dashboard_data.json` terbaru ter-upload ke `$web`
+- [x] Trigger `arm-daily-pipeline-74220` → pipeline berjalan tanpa error
+- [x] Step 0: Data hari ini ter-scrape dan ter-append ke Blob
+- [x] Step 5: Telegram alert terkirim ke group
+- [x] Step 6: `dashboard_data.json` terbaru ter-upload ke `$web`
 
 #### Dashboard (Frontend)
 - [ ] Tab 1 (Executive): KPI cards, status grid, anomaly table, heatmap
@@ -381,8 +381,8 @@ Jadi overhaul utamanya adalah **restrukturisasi layout ke 4 tab** + tambah fitur
 - [ ] Mobile responsive (basic)
 
 #### Telegram Bot
-- [ ] Alert terkirim ke group saat pipeline jalan
-- [ ] Format pesan premium (emoji, rekomendasi spesifik)
+- [x] Alert terkirim ke group saat pipeline jalan
+- [x] Format pesan premium (emoji, rekomendasi spesifik)
 
 #### Screenshot untuk Dokumentasi
 - [ ] Azure Portal: Functions dashboard
