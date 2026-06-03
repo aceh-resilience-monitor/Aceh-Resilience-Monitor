@@ -563,17 +563,32 @@ def main():
         'priceSources': ALL_SOURCES,
     }
     
+    # Sanitize NaNs to None (valid null in JSON spec)
+    # Author: Aulia
+    import math
+
+    def sanitize_nans(obj):
+        if isinstance(obj, dict):
+            return {k: sanitize_nans(v) for k, v in obj.items()}
+        elif isinstance(obj, list):
+            return [sanitize_nans(v) for v in obj]
+        elif isinstance(obj, float) and math.isnan(obj):
+            return None
+        return obj
+
+    sanitized_dashboard_data = sanitize_nans(dashboard_data)
+
     # Write JSON
     os.makedirs(DASHBOARD_DIR, exist_ok=True)
     output_path = DASHBOARD_DIR / 'dashboard_data.json'
     with open(output_path, 'w', encoding='utf-8') as f:
-        json.dump(dashboard_data, f, ensure_ascii=False, indent=None)
+        json.dump(sanitized_dashboard_data, f, ensure_ascii=False, indent=None)
     
     # Also generate embedded JS version (for file:// CORS compatibility)
     output_js_path = DASHBOARD_DIR / 'dashboard_data.js'
     with open(output_js_path, 'w', encoding='utf-8') as f:
         f.write('const DASHBOARD_DATA = ')
-        json.dump(dashboard_data, f, ensure_ascii=False, indent=None)
+        json.dump(sanitized_dashboard_data, f, ensure_ascii=False, indent=None)
         f.write(';')
     
     elapsed = time.time() - t_start
