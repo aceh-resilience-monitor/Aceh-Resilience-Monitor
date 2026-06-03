@@ -54,12 +54,6 @@
 ```
 MINGGU 1 (14-20 Mei): FOUNDATION
   → Refactor kode + tests + feature engineering + EDA + baseline
-
-MINGGU 2 (21-27 Mei): AZURE & REAL-TIME
-  → Azure ML + MLflow + Azure Functions + Telegram + notebook
-
-MINGGU 3 (28 Mei - 5 Jun): PRESENTASI & SUBMIT
-  → Slides + demo + drill Q&A + docs + submit
 ```
 
 ---

@@ -418,3 +418,63 @@ Status kesehatan ditentukan berdasarkan nilai **Total Margin Tertinggi (Maksimum
     - *Tindakan Sistem:* Untuk kartu status `Tidak Wajar`, sistem otomatis menampilkan notifikasi peringatan merah di bagian paling bawah: **"🚨 Potensi penimbunan/spekulasi — Perlu investigasi Satgas Pangan"**.
 
 ---
+
+## 🏛️ Pertahanan Workflow & Dataflow ARM (Jury Defense Masterclass)
+
+### 1. Poin Pertahanan Utama (Key Defense Pillars)
+Ketika juri melihat diagram alur data, tiga poin ini harus menjadi pesan utama (*core message*) yang Anda sampaikan di awal:
+1.  **Serverless & Cost-Effective ($0/Month):** Seluruh workflow berjalan secara otomatis di Azure Cloud menggunakan skema *Serverless Consumption Plan* dengan biaya Rp 0 (Free Tier). Ini membuktikan solusi ARM sangat realistis untuk diadopsi oleh Pemda mana pun di Indonesia tanpa beban anggaran baru.
+2.  **Transisi dari Reaktif ke Proaktif:** Dasbor biasa hanya menampilkan data masa lalu (reaktif). Aliran data ARM mengawinkan **Z-Score** (mendeteksi anomali harga *hari ini* secara reaktif) dengan **Meta Prophet** (meramal lonjakan harga *90 hari ke depan* secara proaktif) untuk intervensi sebelum inflasi terjadi.
+3.  **Rantai Pasok Hulu-ke-Hilir yang Sehat:** Dataflow memantau 4 level rantai pasok secara harian (Produsen $\rightarrow$ Distributor $\rightarrow$ Eceran Tradisional & Modern) untuk mendeteksi *markup* tidak wajar atau inefisiensi logistik secara spasial.
+
+---
+
+### 2. Pertanyaan Killer Juri & Cara Menjawabnya (Q&A Defense)
+
+#### ❓ Pertanyaan 1: *"Mengapa Anda melatih ulang (retrain) 84 model Prophet secara 'on-the-fly' di RAM setiap hari pada Azure Functions? Mengapa tidak melatihnya sekali lalu disimpan di Model Registry?"*
+*   **Jawaban Pemenang (Golden Answer):**
+    > "Kami memilih strategi **In-Memory Retraining** harian karena model Meta Prophet sangat ringan secara komputasi. Melatih 84 model (21 komoditas $\times$ 4 wilayah) hanya membutuhkan waktu **40 detik** di Azure Functions.
+    > 
+    > Jika kami menggunakan model statis yang disimpan di Model Registry, kami harus menanggung overhead penyimpanan artifacts, risiko data drift karena harga pangan sangat dinamis, dan biaya runtime untuk memuat model PKL harian. Dengan melatih ulang secara on-the-fly setiap pagi menggunakan data historis + data harian terbaru dari Blob Storage, model kami selalu segar dan memiliki akurasi tertinggi untuk prediksi 90 hari ke depan."
+
+#### ❓ Pertanyaan 2: *"Bagaimana Anda menangani ukuran berkas data dasbor (`dashboard_data.json`) jika data terus bertambah hingga tahun 2026? Dasbor Anda akan menjadi lambat saat memuat data."*
+*   **Jawaban Pemenang (Golden Answer):**
+    > "Kami telah mengimplementasikan **Data Compression Pipeline (Weekly Resampling)** di backend.
+    > 
+    > Untuk data historis tahun 2021 hingga 2025, kami tidak mengirimkan data harian ke browser. Kami mereduksi data tersebut menjadi rata-rata mingguan (`.resample('W').mean()`) yang mengurangi ukuran payload hingga **85%** (dari ~3.5 MB menjadi hanya **509 KB**).
+    > 
+    > Browser hanya menerima data resolusi harian untuk 90 hari terakhir untuk keperluan visualisasi detail dan deteksi EWS. Hasilnya, dashboard memuat secara instan (LCP < 2 detik) tanpa kehilangan tren historis jangka panjang."
+
+#### ❓ Pertanyaan 3: *"Mengapa Anda menggunakan CORS Rules pada Azure Storage Account? Apa fungsinya dalam dataflow ini?"*
+*   **Jawaban Pemenang (Golden Answer):**
+    > "Kami menggunakan **CORS (Cross-Origin Resource Sharing) Rules** karena dasbor kami dihosting secara serverless di **Azure Static Web Apps** (misal: domain `thankful-river-*.azurestaticapps.net`), sedangkan berkas data `dashboard_data.json` berada di **Azure Blob Storage** (domain `armmlworkspace*.blob.core.windows.net`).
+    > 
+    > Secara default, peramban (browser) juri akan memblokir request lintas domain demi keamanan (*Same-Origin Policy*). Dengan mengonfigurasi aturan CORS di Storage Account, kami mengizinkan domain dasbor SWA kami untuk mengunduh JSON data secara aman tanpa hambatan CORS error."
+
+#### ❓ Pertanyaan 4: *"Apa perbedaan mendasar antara Z-Score Anomaly dan Prophet EWS dalam dataflow Anda? Kapan Telegram memicu alert?"*
+*   **Jawaban Pemenang (Golden Answer):**
+    > "Keduanya memiliki peran yang saling melengkapi di **Layer 3 & 4 (Analytics & Intelligence)**:
+    > 
+    > 1.  **Z-Score (Reaktif):** Mengukur deviasi harga *hari ini* terhadap rata-rata bergerak 30 hari terakhir (MA30). Jika harga hari ini tiba-tiba melonjak di atas $2\sigma$ (Waspada) atau $3\sigma$ (Kritis) dari tren bulanannya, sistem mendeteksi anomali.
+    > 2.  **Prophet EWS (Proaktif):** Memproyeksikan harga 90 hari ke depan. Jika harga prediksi menunjukkan kenaikan $\ge 20\%$ dibandingkan harga aktual terakhir, EWS akan menyala merah.
+    > 
+    > Telegram alert akan dipicu secara otomatis oleh Azure Function pada pukul 08:00 WIB jika **salah satu dari kedua kondisi tersebut terpenuhi**, langsung mengirimkan pesan berisi komoditas yang bermasalah beserta saran aksi spesifik dari TPID."
+
+#### ❓ Pertanyaan 5: *"Bagaimana Anda memastikan data kosong (missing values) tidak merusak alur data dan visualisasi dasbor?"*
+*   **Jawaban Pemenang (Golden Answer):**
+    > "Kami menangani data kosong pada dua sisi:
+    > 
+    > Di **sisi backend (Python)**, kami menggunakan pembagi dinamis dan fungsi `.mean()` yang secara otomatis mengabaikan nilai kosong (`NaN`) tanpa merusak perhitungan rata-rata regional atau provinsi. Sebelum diunggah ke Blob, seluruh nilai `NaN` secara eksplisit disaring dan diubah menjadi `null` standar JSON.
+    > 
+    > Di **sisi frontend (JS)**, jika ada nilai `null` (seperti kasus Cabai Rawit Merah yang tidak memiliki data eceran), dasbor tidak akan menampilkan error atau angka `0` yang membingungkan. Dasbor secara elegan merendernya sebagai **'Tidak Tersedia'** dengan badge abu-abu **'Data Kosong'**, menjaga estetika UI tetap premium dan jujur terhadap ketersediaan data di lapangan."
+
+---
+
+### 📈 3. Cara Mempresentasikan Alur Data (Slide Delivery Guide)
+Saat menjelaskan slide arsitektur/dataflow, gunakan metode **"Ikuti Aliran Uang/Data"** secara berurutan:
+1.  **Ingestion:** *"Data dimulai dari PIHPS BI yang ditarik secara harian, digabungkan dengan data lake historis 6 tahun di Azure Blob Storage."*
+2.  **Processing:** *"Setiap jam 8 pagi, Azure Functions bangun secara serverless, menarik data tersebut, lalu memproses fitur Meugang dan melatih model di memori."*
+3.  **Outputting:** *"Hasil analisis dipecah menjadi metrik MLOps untuk Azure ML Studio, laporan taktis ke Telegram Bot, dan JSON terkompresi ke Static Web Apps."*
+4.  **Consumption:** *"Pengguna akhir (Satgas Pangan & TPID Aceh) mengonsumsi informasi ini lewat Telegram grup dan Dasbor visual interaktif."*
+
+---

@@ -269,9 +269,14 @@ graph LR
 
     subgraph "docs/"
         DOC1["eda_interpretation.md\n(+ hipotesis formal)"]
-        DOC2["azure_architecture.md"]
+        DOC2["azure_architecture.md\n(skalabilitas)"]
         DOC3["data_dictionary.md"]
-        DOC4["limitations.md\n(etika + skalabilitas)"]
+        DOC4["learning_guide.md\n(MLOps & git conflict)"]
+    end
+
+    subgraph "root/"
+        R1["evaluation_prophet.md\n(baseline + etika + limitasi)"]
+        R2["run_guide.md\n(operation manual)"]
     end
 
     subgraph "Azure Services"
@@ -327,18 +332,19 @@ graph TD
     end
 
     subgraph "Pilar 3: AI & Azure — 30%"
-        P3A["Azure ML + MLflow\n(18 experiments logged)"]
+        P3A["Azure ML + MLflow\n(84 experiments logged)"]
         P3B["Azure Functions\n(daily automated pipeline)"]
         P3C["Azure Blob Storage\n(data lake)"]
         P3D["Azure Static Web Apps\n(dashboard hosting)"]
-        P3E["docs/azure_architecture.md"]
+        P3E["docs/azure_architecture.md\n(arsitektur cloud)"]
     end
 
     subgraph "Pilar 4: Insight & Solusi — 20%"
         P4A["dashboard/app.js\n(EWS cards + rekomendasi)"]
         P4B["Telegram Bot\n(push notifications)"]
-        P4C["docs/limitations.md\n(etika + skalabilitas)"]
-        P4D["Slide presentasi\n(storytelling)"]
+        P4C["evaluation_prophet.md\n(etika + limitasi)"]
+        P4D["docs/azure_architecture.md\n(skalabilitas)"]
+        P4E["run_guide.md + docs/learning_guide.md\n(user guides)"]
     end
 ```
 
