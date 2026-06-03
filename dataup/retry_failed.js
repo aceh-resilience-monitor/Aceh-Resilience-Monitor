@@ -15,7 +15,7 @@ const LOG_FILE = path.join(__dirname, 'process.log');
 
 // Generate a unique key for deduplication so we don't accidentally add the same item twice
 const generateKey = (item) => {
-    return `${item.tanggal}|${item.komoditas}|${item.daerah}|${item.sumber}`;
+    return `${item.tanggal}|${item.name}|${item.daerah}|${item.sumber}`;
 };
 
 const runRetryFailed = async () => {

@@ -14,7 +14,7 @@ const PRICE_TYPE_IDS = [1, 2, 3, 4];
 
 // Generate a unique key for deduplication
 const generateKey = (item) => {
-    return `${item.tanggal}|${item.komoditas}|${item.daerah}|${item.sumber}`;
+    return `${item.tanggal}|${item.name}|${item.daerah}|${item.sumber}`;
 };
 
 const processDate = async (dateStr, existingDataMap) => {

@@ -81,16 +81,17 @@ def build_timeseries_daily_recent(df_prov, commodities, latest_date, days=90):
 def build_commodity_cards(df_prov, commodities, anomalies, latest_date):
     """Build status cards for each commodity."""
     years = sorted(df_prov['year'].unique())
-    latest_year = max(years)
-    earliest_year = min(years)
+    latest_year = max(years) # Mengambil tahun terbaru secara dinamis 
+    earliest_year = min(years) # Mengambil tahun terlama
     
     yearly_mean = df_prov.groupby(['year', 'commodity'])['price'].mean().unstack(level=0)
     
-    # Total change: latest year vs earliest year
-    if latest_year in yearly_mean.columns and earliest_year in yearly_mean.columns:
+    # 3-year change: latest year vs (latest year - 3)
+    start_year_3y = max(earliest_year, latest_year - 3)
+    if latest_year in yearly_mean.columns and start_year_3y in yearly_mean.columns:
         total_change = (
-            (yearly_mean[latest_year] - yearly_mean[earliest_year]) /
-            yearly_mean[earliest_year] * 100
+            (yearly_mean[latest_year] - yearly_mean[start_year_3y]) /
+            yearly_mean[start_year_3y] * 100
         )
     else:
         total_change = pd.Series(0, index=commodities)
@@ -302,24 +303,51 @@ def build_regional_data(df, commodities):
 def build_price_by_source(df, commodities):
     """
     Build price-by-source data for margin analysis (Tier 2B).
-    Shows latest price per source type for each commodity.
+    Shows latest price per source type for each commodity, both aggregated and per-region.
     """
-    df_src = aggregate_prices(df, by='source')
-    latest_date = df_src['date'].max()
-    recent = df_src[df_src['date'] >= latest_date - pd.Timedelta(days=7)]
+    # 1. Aggregated (Provincial) level
+    df_src_agg = aggregate_prices(df, by='source')
+    latest_date_agg = df_src_agg['date'].max()
+    recent_agg = df_src_agg[df_src_agg['date'] >= latest_date_agg - pd.Timedelta(days=7)]
+    
+    # 2. Regional level (keep daerah column)
+    df_src_reg = df.groupby(['date', 'commodity', 'daerah', 'sumber'], as_index=False)['price'].mean()
+    latest_date_reg = df_src_reg['date'].max()
+    recent_reg = df_src_reg[df_src_reg['date'] >= latest_date_reg - pd.Timedelta(days=7)]
     
     result = {}
     for commodity in commodities:
-        result[commodity] = {}
+        result[commodity] = {
+            'aggregated': {}
+        }
+        for region in ALL_REGIONS:
+            result[commodity][region] = {}
+            
+        # Build aggregated (provincial)
         for source in ALL_SOURCES:
-            cdf = recent[
-                (recent['commodity'] == commodity) &
-                (recent['sumber'] == source)
+            cdf = recent_agg[
+                (recent_agg['commodity'] == commodity) &
+                (recent_agg['sumber'] == source)
             ]
             if not cdf.empty:
-                result[commodity][source] = {
-                    'latestPrice': round(float(cdf['price'].mean()), 0),
+                latest = cdf.sort_values('date').iloc[-1]
+                result[commodity]['aggregated'][source] = {
+                    'latestPrice': round(float(latest['price']), 0),
                 }
+                
+        # Build regional
+        for region in ALL_REGIONS:
+            for source in ALL_SOURCES:
+                cdf = recent_reg[
+                    (recent_reg['commodity'] == commodity) &
+                    (recent_reg['daerah'] == region) &
+                    (recent_reg['sumber'] == source)
+                ]
+                if not cdf.empty:
+                    latest = cdf.sort_values('date').iloc[-1]
+                    result[commodity][region][source] = {
+                        'latestPrice': round(float(latest['price']), 0),
+                    }
     return result
 
 
@@ -411,7 +439,10 @@ def main():
     # ── 1. Load data ──
     logger.info("Loading data from dataup JSON...")
     df = load_all_data()
-    df_prov = aggregate_prices(df, by='province')
+    
+    # Filter for consumer-facing markets (Traditional & Modern) for main metrics
+    df_consumer = df[df['sumber'].isin(['Pasar Tradisional', 'Pasar Modern'])]
+    df_prov = aggregate_prices(df_consumer, by='province')
     
     commodities = sorted(df_prov['commodity'].unique())
     latest_date = df_prov['date'].max()
@@ -425,7 +456,7 @@ def main():
     
     # ── 3. Anomaly detection (regional level - kabupaten/kota) ──
     logger.info("Detecting anomalies...")
-    df_region = aggregate_prices(df, by='region')
+    df_region = aggregate_prices(df_consumer, by='region')
     anomalies = detect_anomalies(df_region, commodities, group_by='daerah')
     
     # Enrich anomalies with shortName and category for frontend compatibility
@@ -443,7 +474,7 @@ def main():
     try:
         from scripts.forecast import forecast_all_commodities
         forecasts = forecast_all_commodities(
-            df, commodities, latest_date,
+            df_consumer, commodities, latest_date,
             periods=FORECAST_DAYS, per_region=True
         )
     except Exception as e:
@@ -464,7 +495,7 @@ def main():
     
     # ── 8. Regional data (Tier 2 dashboard) ──
     logger.info("Building regional comparison data...")
-    regional = build_regional_data(df, commodities)
+    regional = build_regional_data(df_consumer, commodities)
     price_by_source = build_price_by_source(df, commodities)
     
     # Also build regional forecasts dict from the per-region forecasts
