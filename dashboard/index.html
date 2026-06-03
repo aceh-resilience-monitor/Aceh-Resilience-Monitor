@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Aceh Resilience Monitor — Dashboard Intelijen Harga Pangan</title>
-  <meta name="description" content="Platform intelijen bisnis end-to-end untuk mendeteksi anomali harga pangan strategis di pasar-pasar utama Aceh. Pantau 18 komoditas pangan secara real-time.">
+  <meta name="description" content="Platform intelijen bisnis end-to-end untuk mendeteksi anomali harga pangan strategis di pasar-pasar utama Aceh. Pantau 21 komoditas pangan dengan update harian otomatis.">
 
   <!-- Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -14,6 +14,10 @@
   <!-- Chart.js -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+
+  <!-- Leaflet Map Integration (Interactive GIS Map) -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 
   <!-- Styles -->
   <link rel="stylesheet" href="style.css">
@@ -39,182 +43,344 @@
         </div>
       </div>
       <div class="navbar-meta">
-        <div class="navbar-badge live">Monitoring Aktif</div>
+        <div class="region-select-wrap">
+          <span style="margin-right: 6px; font-size: 14px;">📍</span>
+          <select id="region-selector" class="region-select" onchange="changeRegion(this.value)">
+            <option value="aggregated">Seluruh Provinsi (Rata-rata)</option>
+            <option value="Banda Aceh">Banda Aceh</option>
+            <option value="Lhokseumawe">Lhokseumawe</option>
+            <option value="Meulaboh">Meulaboh</option>
+          </select>
+        </div>
+        <div class="navbar-badge live">Update Harian Otomatis</div>
         <div class="navbar-date" id="data-date-range">—</div>
       </div>
     </nav>
 
-    <!-- ── KPI Overview ─────────────────────────────────────── -->
-    <section id="section-overview">
-      <div id="kpi-grid" class="kpi-grid"></div>
-    </section>
-
-    <!-- ── Early Warning System Panel (Meta Prophet) ─────────────────────── -->
-    <section id="section-early-warning" class="mb-4">
-      <div class="section-header">
-        <div>
-          <h2 class="section-title"><span class="icon">🚨</span> Early Warning System (Meta Prophet AI)</h2>
-          <p class="section-desc">Prediksi 3 komoditas paling rentan mengalami lonjakan harga ekstrem dalam 90 hari ke depan</p>
-        </div>
-      </div>
-      <div id="early-warning-grid" class="kpi-grid" style="grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));">
-        <!-- Cards injected by JS -->
-      </div>
-    </section>
-
-    <!-- ── Status Legend ─────────────────────────────────────── -->
-    <div class="legend-strip">
-      <span class="text-muted" style="font-weight:600">Status Komoditas:</span>
-      <div class="legend-item">
-        <div class="legend-dot" style="background:#22c55e"></div>
-        <span>Aman (CV &lt;5%, Kenaikan &lt;10%)</span>
-      </div>
-      <div class="legend-item">
-        <div class="legend-dot" style="background:#f59e0b"></div>
-        <span>Waspada (CV 5-15% atau Kenaikan 10-20%)</span>
-      </div>
-      <div class="legend-item">
-        <div class="legend-dot" style="background:#ef4444"></div>
-        <span>Kritis (CV &gt;15% atau Kenaikan &gt;20%)</span>
-      </div>
+    <!-- ═══ Tab Navigation Bar (Glassmorphism) ═══════════════════ -->
+    <div class="tab-nav" id="tab-nav">
+      <button class="tab-btn active" data-tab="tab-executive" onclick="switchTab('tab-executive')">
+        <span class="tab-icon">📊</span>
+        <span class="tab-label">Executive</span>
+      </button>
+      <button class="tab-btn" data-tab="tab-spatial" onclick="switchTab('tab-spatial')">
+        <span class="tab-icon">📍</span>
+        <span class="tab-label">Spatial</span>
+      </button>
+      <button class="tab-btn" data-tab="tab-margin" onclick="switchTab('tab-margin')">
+        <span class="tab-icon">💸</span>
+        <span class="tab-label">Margin</span>
+      </button>
+      <button class="tab-btn" data-tab="tab-forecast" onclick="switchTab('tab-forecast')">
+        <span class="tab-icon">🔮</span>
+        <span class="tab-label">ML EWS</span>
+      </button>
     </div>
 
-    <!-- ── Commodity Status Grid ─────────────────────────────── -->
-    <section id="section-status">
-      <div class="section-header">
-        <div>
-          <h2 class="section-title"><span class="icon">📊</span> Status Komoditas</h2>
-          <p class="section-desc">Klik komoditas untuk melihat detail analisis</p>
-        </div>
-      </div>
-      <div id="commodity-grid" class="commodity-grid"></div>
-    </section>
+    <!-- ═══════════════════════════════════════════════════════════
+         TAB 1: EXECUTIVE DASHBOARD (Macro & Operational Report)
+         Target: Kepala Dinas / Gubernur — pantau keamanan pangan 3 detik
+         ═══════════════════════════════════════════════════════════ -->
+    <div id="tab-executive" class="tab-content active">
 
-    <!-- ── Commodity Detail Panel (hidden by default) ────────── -->
-    <div id="detail-panel" class="detail-panel"></div>
+      <!-- ── KPI Overview ─────────────────────────────────────── -->
+      <section id="section-overview">
+        <div id="kpi-grid" class="kpi-grid"></div>
+      </section>
 
-    <!-- ── Price Trend Chart ─────────────────────────────────── -->
-    <section id="section-trends">
-      <div class="section-header">
-        <div>
-          <h2 class="section-title"><span class="icon">📈</span> Tren Harga Komoditas</h2>
-          <p class="section-desc">Harga mingguan rata-rata seluruh komoditas (2023–2025)</p>
-        </div>
-      </div>
-      <div class="glass-card">
-        <div id="trend-category-filter" class="chart-controls"></div>
-        <div class="chart-controls" style="margin-top: -8px; margin-bottom: 20px;">
-          <button id="toggle-forecast-btn" class="chart-btn special" onclick="toggleForecast()">
-            🔮 Tampilkan Prediksi 90 Hari
-          </button>
-        </div>
-        <div class="chart-container tall">
-          <canvas id="chart-price-trend"></canvas>
-        </div>
-      </div>
-    </section>
-
-    <!-- ── Two-Column: Alerts + Anomaly Table ────────────────── -->
-    <section id="section-alerts">
-      <div class="section-header">
-        <div>
-          <h2 class="section-title"><span class="icon">🚨</span> Sistem Peringatan Dini</h2>
-          <p class="section-desc">Deteksi anomali harga yang melampaui 2σ dari rata-rata bergerak 30 hari</p>
-        </div>
-      </div>
-      <div class="two-col">
-        <!-- Alert Feed -->
-        <div class="glass-card">
-          <h3 style="font-size:15px;font-weight:700;margin-bottom:12px">
-            🔔 Feed Peringatan Terbaru
-          </h3>
-          <div id="alert-feed" class="alert-feed"></div>
-        </div>
-        <!-- Anomaly Table -->
-        <div class="glass-card">
-          <h3 style="font-size:15px;font-weight:700;margin-bottom:12px">
-            📋 Tabel Anomali Terdeteksi
-          </h3>
-          <div class="anomaly-table-wrap">
-            <table class="anomaly-table" id="anomaly-table">
-              <thead>
-                <tr>
-                  <th>Tanggal</th>
-                  <th>Komoditas</th>
-                  <th>Kategori</th>
-                  <th>Harga</th>
-                  <th>MA30</th>
-                  <th>Deviasi</th>
-                  <th>Z-Score</th>
-                  <th>Status</th>
-                </tr>
-              </thead>
-              <tbody id="anomaly-table-body"></tbody>
-            </table>
+      <!-- ── SVG Map Aceh (Modul I) ───────────────────────────── -->
+      <section id="section-map" class="mb-4">
+        <div class="section-header">
+          <div>
+            <h2 class="section-title"><span class="icon">🗺️</span> Peta Anomali Harga — Provinsi Aceh</h2>
+            <p class="section-desc">Daerah berwarna merah/kuning menunjukkan anomali harga aktif (Z-Score &gt; 2σ)</p>
           </div>
         </div>
-      </div>
-    </section>
-
-    <!-- ── YoY Comparison ────────────────────────────────────── -->
-    <section id="section-yoy">
-      <div class="section-header">
-        <div>
-          <h2 class="section-title"><span class="icon">📊</span> Perbandingan Year-over-Year</h2>
-          <p class="section-desc">Perubahan harga rata-rata tahunan per komoditas</p>
-        </div>
-      </div>
-      <div class="glass-card">
-        <div class="chart-container tall">
-          <canvas id="chart-yoy"></canvas>
-        </div>
-      </div>
-    </section>
-
-    <!-- ── Two-Column: Seasonality + Volatility ──────────────── -->
-    <section id="section-analysis">
-      <div class="two-col">
-        <!-- Seasonality Heatmap -->
-        <div>
-          <div class="section-header">
-            <div>
-              <h2 class="section-title"><span class="icon">🗓️</span> Pola Seasonalitas</h2>
-              <p class="section-desc">Z-Score harga bulanan (merah = mahal, hijau = murah)</p>
+        <div class="glass-card" id="aceh-map-container" style="position: relative; padding: 0; overflow: hidden; border-radius: 12px; border: 1px solid var(--border-glass); background: #0b0f19;">
+          <!-- Real Interactive Leaflet GIS Map -->
+          <div id="aceh-leaflet-map" style="width: 100%; height: 380px; z-index: 1;"></div>
+          
+          <!-- Floating Legend (Premium UI Glassmorphism) -->
+          <div class="map-floating-legend" style="position: absolute; bottom: 16px; right: 16px; z-index: 1000; background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.08); padding: 12px 16px; border-radius: 10px; pointer-events: auto; width: 180px;">
+            <div style="color: var(--text-muted); font-size: 10px; font-weight: 700; margin-bottom: 8px; letter-spacing: 0.5px; font-family: 'Inter';">STATUS ANOMALI</div>
+            <div style="display: flex; align-items: center; gap: 8px; font-size: 11px; margin-bottom: 6px; font-family: 'Inter'; color: var(--text-secondary);">
+              <span class="legend-pulse critical" style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #ef4444; box-shadow: 0 0 8px #ef4444;"></span>
+              <span>Kritis (Z &gt; 3σ)</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 8px; font-size: 11px; margin-bottom: 6px; font-family: 'Inter'; color: var(--text-secondary);">
+              <span class="legend-pulse warning" style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #f59e0b; box-shadow: 0 0 8px #f59e0b;"></span>
+              <span>Waspada (Z &gt; 2σ)</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 8px; font-size: 11px; font-family: 'Inter'; color: var(--text-secondary);">
+              <span class="legend-pulse normal" style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #14b8a6; box-shadow: 0 0 8px #14b8a6;"></span>
+              <span>Normal</span>
             </div>
           </div>
-          <div class="glass-card">
-            <div id="seasonality-heatmap"></div>
+        </div>
+        <div id="map-status-summary" style="text-align:center; margin-top: 10px; font-size: 12px; color: var(--text-muted);"></div>
+      </section>
+
+      <!-- ── Status Legend ─────────────────────────────────────── -->
+      <div class="legend-strip">
+        <span class="text-muted" style="font-weight:600">Status Komoditas:</span>
+        <div class="legend-item">
+          <div class="legend-dot" style="background:#22c55e"></div>
+          <span>Aman (CV &lt;5%, Kenaikan &lt;10%)</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-dot" style="background:#f59e0b"></div>
+          <span>Waspada (CV 5-15% atau Kenaikan 10-20%)</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-dot" style="background:#ef4444"></div>
+          <span>Kritis (CV &gt;15% atau Kenaikan &gt;20%)</span>
+        </div>
+      </div>
+
+      <!-- ── Commodity Status Grid ─────────────────────────────── -->
+      <section id="section-status">
+        <div class="section-header">
+          <div>
+            <h2 class="section-title"><span class="icon">📊</span> Status Komoditas</h2>
+            <p class="section-desc">Klik komoditas untuk melihat detail analisis</p>
           </div>
         </div>
-        <!-- Volatility Heatmap -->
-        <div>
-          <div class="section-header">
-            <div>
-              <h2 class="section-title"><span class="icon">⚡</span> Volatilitas (CV%)</h2>
-              <p class="section-desc">Coefficient of Variation per komoditas per tahun</p>
+        <div id="commodity-grid" class="commodity-grid"></div>
+      </section>
+
+      <!-- ── Commodity Detail Panel (hidden by default) ────────── -->
+      <div id="detail-panel" class="detail-panel"></div>
+
+      <!-- ── Two-Column: Alerts + Anomaly Table ────────────────── -->
+      <section id="section-alerts">
+        <div class="section-header">
+          <div>
+            <h2 class="section-title"><span class="icon">🚨</span> Sistem Peringatan Dini</h2>
+            <p class="section-desc">Deteksi anomali harga yang melampaui 2σ dari rata-rata bergerak 30 hari</p>
+          </div>
+        </div>
+        <div class="two-col">
+          <!-- Alert Feed -->
+          <div class="glass-card">
+            <h3 style="font-size:15px;font-weight:700;margin-bottom:12px">
+              🔔 Feed Peringatan Terbaru
+            </h3>
+            <div id="alert-feed" class="alert-feed"></div>
+          </div>
+          <!-- Anomaly Table -->
+          <div class="glass-card">
+            <h3 style="font-size:15px;font-weight:700;margin-bottom:12px">
+              📋 Tabel Anomali Terdeteksi
+            </h3>
+            <div class="anomaly-table-wrap">
+              <table class="anomaly-table" id="anomaly-table">
+                <thead>
+                  <tr>
+                    <th>Tanggal</th>
+                    <th>Komoditas</th>
+                    <th>Kategori</th>
+                    <th>Harga</th>
+                    <th>MA30</th>
+                    <th>Deviasi</th>
+                    <th>Z-Score</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody id="anomaly-table-body"></tbody>
+              </table>
             </div>
           </div>
-          <div class="glass-card">
-            <div id="volatility-heatmap"></div>
+        </div>
+      </section>
+
+      <!-- ── Two-Column: Seasonality + Volatility ──────────────── -->
+      <section id="section-analysis">
+        <div class="two-col">
+          <!-- Seasonality Heatmap -->
+          <div>
+            <div class="section-header">
+              <div>
+                <h2 class="section-title"><span class="icon">🗓️</span> Pola Seasonalitas</h2>
+                <p class="section-desc">Z-Score harga bulanan (merah = mahal, hijau = murah)</p>
+              </div>
+            </div>
+            <div class="glass-card">
+              <div id="seasonality-heatmap"></div>
+            </div>
+          </div>
+          <!-- Volatility Heatmap -->
+          <div>
+            <div class="section-header">
+              <div>
+                <h2 class="section-title"><span class="icon">⚡</span> Volatilitas (CV%)</h2>
+                <p class="section-desc">Coefficient of Variation per komoditas per tahun</p>
+              </div>
+            </div>
+            <div class="glass-card">
+              <div id="volatility-heatmap"></div>
+            </div>
           </div>
         </div>
-      </div>
-    </section>
+      </section>
 
-    <!-- ── Stacked Area Chart ────────────────────────────────── -->
-    <section id="section-category">
-      <div class="section-header">
-        <div>
-          <h2 class="section-title"><span class="icon">📉</span> Kontribusi Kategori terhadap Total Harga</h2>
-          <p class="section-desc">Harga rata-rata bulanan per kategori (ekskl. Daging Sapi)</p>
+    </div><!-- END tab-executive -->
+
+
+    <!-- ═══════════════════════════════════════════════════════════
+         TAB 2: SPATIAL (Regional Disparity & Arbitrage Advisor)
+         Target: Satgas Pangan & Dinas Perhubungan — operasi pasar
+         ═══════════════════════════════════════════════════════════ -->
+    <div id="tab-spatial" class="tab-content">
+
+      <!-- ── Regional Price Comparison (existing, expanded) ────── -->
+      <section id="section-regional-analysis" class="mb-4">
+        <div class="section-header">
+          <div>
+            <h2 class="section-title"><span class="icon">📍</span> Analisis Komparatif Regional</h2>
+            <p class="section-desc" id="regional-analysis-subtitle">Perbandingan harga antar daerah utama untuk seluruh komoditas</p>
+          </div>
+          <div>
+            <select id="spatial-commodity-select" class="region-select" style="background: var(--bg-card); border: 1px solid var(--border-glass); border-radius: 8px; padding: 8px 12px; min-width: 200px;" onchange="onSpatialCommodityChange(this.value)">
+              <!-- Populated by JS -->
+            </select>
+          </div>
         </div>
-      </div>
-      <div class="glass-card">
-        <div class="chart-container tall">
-          <canvas id="chart-category-area"></canvas>
+        <div class="two-col" style="grid-template-columns: 1fr 1.2fr; gap: 16px;">
+          <!-- A. Regional Price Comparison (3-Column) -->
+          <div class="glass-card" id="card-regional-disparity" style="display: flex; flex-direction: column; justify-content: space-between; min-height: 280px; padding: 24px;">
+            <!-- Injected by JS -->
+          </div>
+          <!-- B. Regional Timeseries Chart -->
+          <div class="glass-card" id="card-regional-chart" style="padding: 24px;">
+            <h3 style="font-size: 15px; font-weight: 700; margin-bottom: 16px; color: var(--text-primary);">
+              📈 Tren Harga Antar Daerah
+            </h3>
+            <div class="chart-container" style="height: 280px;">
+              <canvas id="chart-regional-comparison"></canvas>
+            </div>
+          </div>
         </div>
-      </div>
-    </section>
+      </section>
+
+      <!-- ── Arbitrage Advisor (Modul G — NEW) ─────────────────── -->
+      <section id="section-arbitrage" class="mb-4">
+        <div class="section-header">
+          <div>
+            <h2 class="section-title"><span class="icon">💡</span> Arbitrage Advisor — Rekomendasi Logistik</h2>
+            <p class="section-desc">Deteksi otomatis komoditas dengan disparitas harga &gt;30% antar daerah beserta rekomendasi aksi</p>
+          </div>
+        </div>
+        <div id="arbitrage-advisor-grid">
+          <!-- Injected by JS: renderArbitrageAdvisor() -->
+        </div>
+      </section>
+
+    </div><!-- END tab-spatial -->
+
+
+    <!-- ═══════════════════════════════════════════════════════════
+         TAB 3: MARGIN (Supply Chain & Distribution Health Check)
+         Target: KPPU / Satgas Pangan — deteksi penimbunan & spekulasi
+         ═══════════════════════════════════════════════════════════ -->
+    <div id="tab-margin" class="tab-content">
+
+      <!-- ── Health Summary ────────────────────────────────────── -->
+      <section id="section-margin-summary" class="mb-4">
+        <div class="section-header">
+          <div>
+            <h2 class="section-title"><span class="icon">⛓️</span> Kesehatan Rantai Pasok — Seluruh Komoditas</h2>
+            <p class="section-desc">Analisis markup dari Produsen → Pedagang Besar → Pasar Tradisional / Pasar Modern. Markup &gt;40% mengindikasikan potensi penimbunan.</p>
+          </div>
+        </div>
+        <!-- Summary KPI Cards -->
+        <div id="margin-summary-cards" class="kpi-grid" style="grid-template-columns: repeat(3, 1fr); margin-bottom: 24px;">
+          <!-- Injected by JS -->
+        </div>
+      </section>
+
+      <!-- ── Supply Chain Grid (All Commodities) ───────────────── -->
+      <section id="section-margin-grid">
+        <div id="margin-health-grid" class="margin-grid">
+          <!-- Injected by JS: renderMarginHealthTab() -->
+        </div>
+      </section>
+
+    </div><!-- END tab-margin -->
+
+
+    <!-- ═══════════════════════════════════════════════════════════
+         TAB 4: ML EWS (Prophet Forecasting & Predictive Analytics)
+         Target: Badan Ketahanan Pangan — perencanaan 90 hari ke depan
+         ═══════════════════════════════════════════════════════════ -->
+    <div id="tab-forecast" class="tab-content">
+
+      <!-- ── Early Warning System Panel (Meta Prophet) ─────────── -->
+      <section id="section-early-warning" class="mb-4">
+        <div class="section-header">
+          <div>
+            <h2 class="section-title"><span class="icon">🚨</span> Early Warning System (Meta Prophet AI)</h2>
+            <p class="section-desc">Prediksi 3 komoditas paling rentan mengalami lonjakan harga ekstrem dalam 90 hari ke depan</p>
+          </div>
+        </div>
+        <div id="early-warning-grid" class="kpi-grid" style="grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));">
+          <!-- Cards injected by JS -->
+        </div>
+      </section>
+
+      <!-- ── Price Trend Chart ─────────────────────────────────── -->
+      <section id="section-trends">
+        <div class="section-header">
+          <div>
+            <h2 class="section-title"><span class="icon">📈</span> Tren Harga Komoditas</h2>
+            <p class="section-desc">Harga mingguan rata-rata seluruh komoditas (2023–2025)</p>
+          </div>
+        </div>
+        <div class="glass-card">
+          <div id="trend-category-filter" class="chart-controls"></div>
+          <div id="trend-sub-commodity-pills" style="padding: 0 4px; border-top: 1px solid rgba(255,255,255,0.05);"></div>
+          <div class="chart-controls" style="margin-top: 8px; margin-bottom: 20px;">
+            <button id="toggle-forecast-btn" class="chart-btn special" onclick="toggleForecast()">
+              🔮 Tampilkan Prediksi 90 Hari
+            </button>
+          </div>
+          <div class="chart-container tall">
+            <canvas id="chart-price-trend"></canvas>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── YoY Comparison ────────────────────────────────────── -->
+      <section id="section-yoy">
+        <div class="section-header">
+          <div>
+            <h2 class="section-title"><span class="icon">📊</span> Perbandingan Year-over-Year</h2>
+            <p class="section-desc">Perubahan harga rata-rata tahunan per komoditas</p>
+          </div>
+        </div>
+        <div class="glass-card">
+          <div class="chart-container tall">
+            <canvas id="chart-yoy"></canvas>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── Stacked Area Chart ────────────────────────────────── -->
+      <section id="section-category">
+        <div class="section-header">
+          <div>
+            <h2 class="section-title"><span class="icon">📉</span> Kontribusi Kategori terhadap Total Harga</h2>
+            <p class="section-desc">Harga rata-rata bulanan per kategori (ekskl. Daging Sapi)</p>
+          </div>
+        </div>
+        <div class="glass-card">
+          <div class="chart-container tall">
+            <canvas id="chart-category-area"></canvas>
+          </div>
+        </div>
+      </section>
+
+    </div><!-- END tab-forecast -->
+
 
     <!-- ── Footer ────────────────────────────────────────────── -->
     <footer class="footer">

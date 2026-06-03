@@ -1,23 +1,79 @@
-# OS generated files
+# ===========================
+# OS Generated Files
+# ===========================
 .DS_Store
 Thumbs.db
 
+# ===========================
 # Python
+# ===========================
 __pycache__/
 *.py[cod]
 *.egg-info/
 .venv/
 venv/
 env/
+.pytest_cache/
 
+# ===========================
+# Deprecated / Unused
+# ===========================
+fabric_migration/
+
+# ===========================
+# Node.js
+# ===========================
+node_modules/
+coverage/
+
+# ===========================
 # IDE
+# ===========================
 .vscode/
 .idea/
+*.swp
+*.swo
 
-# Temp files
+# ===========================
+# Temp & Log Files
+# ===========================
 *.tmp
 *.log
 data_overview.txt
 stats_overview.txt
 yoy_changes.txt
 ~$*.xlsx
+
+# ===========================
+# Security — JANGAN COMMIT CREDENTIALS!
+# ===========================
+# Azure ML workspace config (berisi subscription ID, resource group)
+config.json
+
+# Environment variables (API keys, tokens)
+.env
+.env.*
+
+# Azure Functions local settings (connection strings, secrets)
+local.settings.json
+
+# Any key or certificate files
+*.pem
+*.key
+*.cert
+
+# Project Specific Excludes
+# ===========================
+.coverage
+ai_agent_masterguide.md
+git_guide.md
+modul_implementation.md
+dataup/data/
+arm_audit_report.md
+
+# ===========================
+# MLflow & Local DBs
+# ===========================
+mlflow.db
+mlruns/
+*.db

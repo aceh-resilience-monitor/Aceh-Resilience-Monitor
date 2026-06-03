@@ -1,6 +1,8 @@
 /**
  * Aceh Resilience Monitor (ARM) — Dashboard Application
  * Interactive commodity price monitoring & anomaly detection
+ * 
+ * Author: Ilhaam (Code & Frontend)
  */
 
 // ── Globals ──────────────────────────────────────────────────────
@@ -9,6 +11,89 @@ let charts = {};
 let selectedCommodity = null;
 let activeCategory = 'all';
 let showForecast = false;
+let selectedRegion = 'aggregated';
+let spatialCommodity = 'Cabai Merah Keriting';
+let activeTab = 'tab-executive';
+// Multi-select set for trend chart: stores commodity keys currently shown
+let selectedCommodities = new Set();
+
+// Leaflet GIS Map Variables (Modul I)
+let mapInstance = null;
+let mapMarkers = {};
+
+// ── Tab Navigation (Modul E) ─────────────────────────────────────
+function switchTab(tabId) {
+  activeTab = tabId;
+  // Toggle tab buttons
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.tab === tabId);
+  });
+  // Toggle tab content
+  document.querySelectorAll('.tab-content').forEach(tc => {
+    tc.classList.toggle('active', tc.id === tabId);
+  });
+  
+  // Resize Chart.js & Leaflet Map to prevent layout glitch on tab switches
+  requestAnimationFrame(() => {
+    Object.values(charts).forEach(c => {
+      if (c && typeof c.resize === 'function') {
+        c.resize();
+      }
+    });
+    if (tabId === 'tab-executive' && mapInstance) {
+      setTimeout(() => {
+        mapInstance.invalidateSize();
+      }, 50);
+    }
+  });
+  // Lazy-render tab content on first visit
+  if (tabId === 'tab-spatial' && !window._spatialRendered) {
+    window._spatialRendered = true;
+    renderSpatialTab();
+  }
+  if (tabId === 'tab-margin' && !window._marginRendered) {
+    window._marginRendered = true;
+    renderMarginHealthTab();
+  }
+  // Scroll to top
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function onSpatialCommodityChange(commodity) {
+  spatialCommodity = commodity;
+  renderRegionalAnalysis(commodity);
+  renderRegionalChart(commodity);
+}
+
+function changeRegion(region) {
+  selectedRegion = region;
+  renderCommodityGrid();
+  updateSVGMap();
+  
+  if (selectedCommodity) {
+    showCommodityDetail(selectedCommodity);
+  } else {
+    updatePriceTrendChart();
+  }
+
+  // Re-render spatial tab if it was already rendered
+  if (window._spatialRendered) {
+    renderSpatialTab();
+  }
+
+  // Re-render margin tab if it was already rendered
+  if (window._marginRendered) {
+    renderMarginHealthTab();
+  }
+
+  // Smooth scroll to Commodity Status Section ONLY if we are on the Executive tab
+  if (activeTab === 'tab-executive') {
+    const target = document.getElementById('section-status');
+    if (target) {
+      target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }
+}
 
 // ── Color Palettes ───────────────────────────────────────────────
 const CATEGORY_COLORS = {
@@ -35,16 +120,18 @@ const MONTH_LABELS = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt
 
 // ── Utility Functions ────────────────────────────────────────────
 function formatPrice(val) {
-  if (val == null) return '-';
+  if (val == null || val === 0) return 'Tidak Tersedia';
   return 'Rp ' + Math.round(val).toLocaleString('id-ID');
 }
 
 function formatPriceShort(val) {
+  if (val == null || val === 0) return '-';
   if (val >= 1000) return (val / 1000).toFixed(0) + 'K';
   return val.toFixed(0);
 }
 
 function formatChange(val) {
+  if (val == null || isNaN(val)) return '-';
   const sign = val > 0 ? '+' : '';
   return sign + val.toFixed(1) + '%';
 }
@@ -63,7 +150,7 @@ function delay(ms) {
 async function loadData() {
   try {
     // 1. Try fetching from Azure Blob Storage (Data Lake)
-    const blobUrl = 'https://armdatalake2026.blob.core.windows.net/arm-data/dashboard_data.json';
+    const blobUrl = 'https://armmlworkspace7422048783.z23.web.core.windows.net/dashboard_data.json';
     const resp = await fetch(blobUrl);
     if (resp.ok) {
       DATA = await resp.json();
@@ -85,6 +172,55 @@ async function loadData() {
   }
 }
 
+// ── Initialize Leaflet Map (Modul I — Real Geography) ─────────────
+function initLeafletMap() {
+  try {
+    // Coordinate of Aceh Center: [4.4, 96.5], Zoom: 7.5
+    mapInstance = L.map('aceh-leaflet-map', {
+      zoomControl: true,
+      attributionControl: false,
+      scrollWheelZoom: false
+    }).setView([4.4, 96.5], 7.5);
+
+    // CartoDB Dark Matter tiles (premium dark mode GIS style)
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+      maxZoom: 18,
+      subdomains: 'abcd'
+    }).addTo(mapInstance);
+
+    const cities = {
+      'Banda Aceh': [5.5483, 95.3238],
+      'Lhokseumawe': [5.1801, 97.1507],
+      'Meulaboh': [4.1449, 96.1269]
+    };
+
+    Object.entries(cities).forEach(([cityName, coords]) => {
+      // Custom pulse div icon
+      const customIcon = L.divIcon({
+        className: 'map-pulse-marker normal',
+        html: `<div class="pulse-ring"></div><div class="pulse-dot"></div><span class="marker-label">${cityName}</span>`,
+        iconSize: [20, 20],
+        iconAnchor: [10, 10]
+      });
+
+      const marker = L.marker(coords, { icon: customIcon }).addTo(mapInstance);
+      
+      // Interactive Click to change active region
+      marker.on('click', () => {
+        const selector = document.getElementById('region-selector');
+        if (selector) {
+          selector.value = cityName;
+          changeRegion(cityName);
+        }
+      });
+
+      mapMarkers[cityName] = marker;
+    });
+  } catch (err) {
+    console.error('Error initializing Leaflet map:', err);
+  }
+}
+
 // ── Initialize App ───────────────────────────────────────────────
 async function initApp() {
   const loaded = await loadData();
@@ -93,20 +229,33 @@ async function initApp() {
     return;
   }
 
+  // Initialize interactive geographical map first
+  initLeafletMap();
+
+  // Tab 1 (Executive) — render immediately
   renderKPIs();
-  renderEarlyWarning();
   renderCommodityGrid();
-  renderPriceTrendChart();
-  renderYoYChart();
-  renderSeasonalityHeatmap();
-  renderVolatilityHeatmap();
   renderAlertFeed();
   renderAnomalyTable();
+  renderSeasonalityHeatmap();
+  renderVolatilityHeatmap();
+  updateSVGMap();
+
+  // Tab 4 (Forecast) — render chart instances
+  renderEarlyWarning();
+  renderPriceTrendChart();
+  renderYoYChart();
   renderCategoryAreaChart();
+
+  // Populate spatial commodity dropdown
+  populateSpatialDropdown();
 
   // Update date display
   document.getElementById('data-date-range').textContent =
     `${DATA.kpi.dataStartDate} — ${DATA.kpi.dataEndDate}`;
+
+  // Default tab
+  switchTab('tab-executive');
 
   // Hide loading
   await delay(400);
@@ -117,12 +266,16 @@ async function initApp() {
 function renderKPIs() {
   const k = DATA.kpi;
   const grid = document.getElementById('kpi-grid');
+  const endYear = k.dataEndDate ? parseInt(k.dataEndDate.substring(0, 4)) : 2025;
+  const startYear = k.dataStartDate ? parseInt(k.dataStartDate.substring(0, 4)) : 2021;
+  const startYear3y = Math.max(startYear, endYear - 3);
+
   const kpis = [
     {
       label: 'Total Komoditas Dipantau',
       value: k.totalCommodities,
       color: 'teal',
-      detail: '18 komoditas pangan strategis',
+      detail: `${k.totalCommodities} komoditas pangan strategis`,
     },
     {
       label: 'Status Kritis',
@@ -140,7 +293,7 @@ function renderKPIs() {
       label: 'Rata-rata Kenaikan (3 Thn)',
       value: formatChange(k.avgPriceChange),
       color: k.avgPriceChange > 15 ? 'red' : 'blue',
-      detail: '2023 → 2025 seluruh komoditas',
+      detail: `${startYear3y} → ${endYear} seluruh komoditas`,
     },
     {
       label: 'Anomali (90 Hari Terakhir)',
@@ -208,9 +361,15 @@ function renderEarlyWarning() {
     return `
       <div class="kpi-card" style="border-top: 4px solid ${borderColor}; position: relative; overflow: hidden; background: linear-gradient(145deg, rgba(30, 41, 59, 0.7) 0%, rgba(15, 23, 42, 0.9) 100%);">
         <div style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(135deg, ${bgGlow} 0%, transparent 100%); pointer-events: none;"></div>
-        <div class="kpi-title" style="display: flex; align-items: center; justify-content: space-between; font-weight: 600;">
-          <span style="font-size: 1.1rem;">${icon} ${p.shortName}</span>
-          <span style="font-size: 0.7rem; padding: 2px 8px; border-radius: 12px; background: ${badgeBg}; color: ${textColor}; font-weight: bold; border: 1px solid ${badgeBorder};">${badge}</span>
+        <div class="kpi-title" style="display: flex; align-items: flex-start; justify-content: space-between; font-weight: 600; width: 100%;">
+          <div style="display: flex; flex-direction: column; gap: 2px; align-items: flex-start;">
+            <span style="font-size: 1.05rem; display: flex; align-items: center; gap: 4px; color: var(--text-primary);">
+              <span>${icon}</span>
+              <span>${p.shortName}</span>
+            </span>
+            ${p.daerah ? `<span style="font-size: 0.75rem; color: var(--text-muted); font-weight: normal; margin-left: 20px;">[${p.daerah}]</span>` : ''}
+          </div>
+          <span style="font-size: 0.7rem; padding: 2px 8px; border-radius: 12px; background: ${badgeBg}; color: ${textColor}; font-weight: bold; border: 1px solid ${badgeBorder}; white-space: nowrap; margin-left: 8px;">${badge}</span>
         </div>
         <div class="kpi-value" style="color: ${textColor}; font-size: 2rem; margin-top: 0.8rem; text-shadow: 0 0 12px ${bgGlow};">
           +${spikePct}%
@@ -274,7 +433,10 @@ function showAllPredictionsModal() {
           onmouseover="this.style.background='rgba(255,255,255,0.04)'"
           onmouseout="this.style.background='transparent'">
         <td style="padding: 10px 12px; color: #94a3b8; font-size: 0.8rem;">${i + 1}</td>
-        <td style="padding: 10px 12px; font-weight: 600;">${icon} ${p.shortName}</td>
+        <td style="padding: 10px 12px; font-weight: 600;">
+          ${icon} ${p.shortName}
+          ${p.daerah ? `<span style="font-size: 0.75rem; color: var(--text-muted); font-weight: normal; margin-left: 4px;">[${p.daerah}]</span>` : ''}
+        </td>
         <td style="padding: 10px 12px; color: ${textColor}; font-weight: 700; font-size: 1.05rem;">+${p.spike_pct.toFixed(1)}%</td>
         <td style="padding: 10px 12px; color: #cbd5e1;">${formatPrice(p.current_price)}</td>
         <td style="padding: 10px 12px; color: ${textColor}; font-weight: 600;">${formatPrice(p.price)}</td>
@@ -342,7 +504,27 @@ function closePredictionsModal() {
 // ── Render Commodity Status Grid ─────────────────────────────────
 function renderCommodityGrid() {
   const grid = document.getElementById('commodity-grid');
-  const cards = DATA.commodityCards;
+  let cards = DATA.commodityCards;
+
+  // Remap cards for specific region (Tier 2 regional support)
+  if (selectedRegion && selectedRegion !== 'aggregated') {
+    cards = cards.map(c => {
+      const regData = DATA.regional[c.commodity] ? DATA.regional[c.commodity][selectedRegion] : null;
+      if (regData) {
+        let status = 'normal';
+        if (regData.cv > 15) status = 'critical';
+        else if (regData.cv > 5) status = 'warning';
+        return {
+          ...c,
+          latestPrice: regData.latestPrice || 0,
+          cvLatest: regData.cv || 0,
+          status: status,
+          recentAnomalies: 0  // region specific anomalies
+        };
+      }
+      return c;
+    });
+  }
 
   // Sort: critical first, then warning, then normal
   const order = { critical: 0, warning: 1, normal: 2 };
@@ -359,16 +541,16 @@ function renderCommodityGrid() {
       </div>
       <div class="commodity-price">${formatPrice(c.latestPrice)}</div>
       <div class="commodity-meta">
-        <span class="commodity-change ${getChangeClass(c.totalChange)}">
-          ${formatChange(c.totalChange)}
+        <span class="commodity-change ${c.latestPrice === 0 ? 'neutral' : getChangeClass(c.totalChange)}">
+          ${c.latestPrice === 0 ? '-' : formatChange(c.totalChange)}
         </span>
-        <span class="commodity-cv">CV ${c.cv2025}%</span>
+        <span class="commodity-cv">${c.latestPrice === 0 ? 'CV -' : `CV ${c.cvLatest}%`}</span>
       </div>
       <div class="mt-1">
-        <span class="status-badge ${c.status}">
-          ${c.status === 'critical' ? '🔴 Kritis' : c.status === 'warning' ? '🟡 Waspada' : '🟢 Aman'}
+        <span class="status-badge ${c.latestPrice === 0 ? 'no-data' : c.status}">
+          ${c.latestPrice === 0 ? '⚪ Data Kosong' : c.status === 'critical' ? '🔴 Kritis' : c.status === 'warning' ? '🟡 Waspada' : '🟢 Aman'}
         </span>
-        ${c.recentAnomalies > 0 ? `<span class="notif-count" style="margin-left:6px">${c.recentAnomalies}</span>` : ''}
+        ${c.recentAnomalies > 0 && c.latestPrice > 0 ? `<span class="notif-count" style="margin-left:6px">${c.recentAnomalies}</span>` : ''}
       </div>
     </div>
   `).join('');
@@ -382,6 +564,7 @@ function selectCommodity(commodity) {
     document.querySelectorAll('.commodity-card').forEach(c => c.classList.remove('selected'));
     document.getElementById('detail-panel').classList.remove('active');
     updatePriceTrendChart();
+    renderRegionalAnalysis('Cabai Merah Keriting');
     return;
   }
 
@@ -404,10 +587,86 @@ function selectCommodity(commodity) {
 
 function showCommodityDetail(commodity) {
   const panel = document.getElementById('detail-panel');
-  const card = DATA.commodityCards.find(c => c.commodity === commodity);
-  const ts = DATA.timeseries[commodity];
+  let card = DATA.commodityCards.find(c => c.commodity === commodity);
+  
+  // Remap card values for regional view
+  if (selectedRegion && selectedRegion !== 'aggregated') {
+    const regData = DATA.regional[commodity] ? DATA.regional[commodity][selectedRegion] : null;
+    if (regData) {
+      let status = 'normal';
+      if (regData.cv > 15) status = 'critical';
+      else if (regData.cv > 5) status = 'warning';
+      card = {
+        ...card,
+        latestPrice: regData.latestPrice || 0,
+        cvLatest: regData.cv || 0,
+        status: status
+      };
+    }
+  }
+
   const vol = DATA.volatility[commodity];
   const anomalies = DATA.anomalies.filter(a => a.commodity === commodity).slice(0, 15);
+
+  // Supply Chain Price-by-Source (Tier 3 supply chain monitoring)
+  let sourceData = DATA.priceBySource[commodity] || {};
+  if (selectedRegion && selectedRegion !== 'aggregated') {
+    sourceData = sourceData[selectedRegion] || {};
+  } else {
+    sourceData = sourceData['aggregated'] || {};
+  }
+  const hasSourceData = Object.keys(sourceData).length > 0;
+  let supplyChainHtml = '';
+  if (hasSourceData) {
+    const prodPrice = sourceData['Produsen'] ? sourceData['Produsen'].latestPrice : null;
+    const bigPrice = sourceData['Pedagang Besar'] ? sourceData['Pedagang Besar'].latestPrice : null;
+    const tradPrice = sourceData['Pasar Tradisional'] ? sourceData['Pasar Tradisional'].latestPrice : null;
+    const modPrice = sourceData['Pasar Modern'] ? sourceData['Pasar Modern'].latestPrice : null;
+    
+    let spreadHtml = '';
+    if (prodPrice && tradPrice) {
+      const spreadPct = ((tradPrice - prodPrice) / prodPrice * 100).toFixed(1);
+      spreadHtml = `<span style="font-size: 11px; color: #f43f5e; font-weight: 600; background: rgba(244, 63, 94, 0.12); border: 1px solid rgba(244, 63, 94, 0.2); padding: 4px 10px; border-radius: 20px; display: inline-flex; align-items: center; gap: 4px;">📈 Margin Rantai Pasok: +${spreadPct}%</span>`;
+    }
+    
+    supplyChainHtml = `
+      <div style="display: flex; flex-direction: column; gap: 16px; padding: 20px; background: rgba(30, 41, 59, 0.4); border-radius: 12px; border: 1px solid rgba(255, 255, 255, 0.08); margin-top: 24px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+          <h4 style="margin: 0; display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 700; color: #f1f5f9;">
+            <span style="font-size: 16px;">⛓️</span> Rantai Pasok & Disparitas Harga (Berdasarkan Sumber)
+          </h4>
+          ${spreadHtml}
+        </div>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px;">
+          
+          <!-- Petani/Produsen -->
+          <div style="background: ${prodPrice ? 'rgba(16, 185, 129, 0.04)' : 'rgba(255, 255, 255, 0.01)'}; border: 1px solid ${prodPrice ? 'rgba(16, 185, 129, 0.15)' : 'rgba(255, 255, 255, 0.05)'}; border-top: 4px solid ${prodPrice ? '#10b981' : '#475569'}; border-radius: 8px; padding: 14px 12px; text-align: center; position: relative; transition: all 0.2s;">
+            <div style="font-size: 11px; color: #94a3b8; text-transform: uppercase; font-weight: 700; letter-spacing: 0.05em; margin-bottom: 8px;">🌾 Petani/Produsen</div>
+            <div style="font-size: 16px; font-weight: 700; font-family: 'JetBrains Mono', monospace; color: ${prodPrice ? '#10b981' : '#64748b'};">${prodPrice ? formatPrice(prodPrice) : 'Tidak ada data'}</div>
+          </div>
+          
+          <!-- Pedagang Besar -->
+          <div style="background: ${bigPrice ? 'rgba(20, 184, 166, 0.04)' : 'rgba(255, 255, 255, 0.01)'}; border: 1px solid ${bigPrice ? 'rgba(20, 184, 166, 0.15)' : 'rgba(255, 255, 255, 0.05)'}; border-top: 4px solid ${bigPrice ? '#14b8a6' : '#475569'}; border-radius: 8px; padding: 14px 12px; text-align: center; position: relative; transition: all 0.2s;">
+            <div style="font-size: 11px; color: #94a3b8; text-transform: uppercase; font-weight: 700; letter-spacing: 0.05em; margin-bottom: 8px;">🏢 Pedagang Besar</div>
+            <div style="font-size: 16px; font-weight: 700; font-family: 'JetBrains Mono', monospace; color: ${bigPrice ? '#14b8a6' : '#64748b'};">${bigPrice ? formatPrice(bigPrice) : 'Tidak ada data'}</div>
+          </div>
+          
+          <!-- Pasar Tradisional -->
+          <div style="background: ${tradPrice ? 'rgba(245, 158, 11, 0.04)' : 'rgba(255, 255, 255, 0.01)'}; border: 1px solid ${tradPrice ? 'rgba(245, 158, 11, 0.15)' : 'rgba(255, 255, 255, 0.05)'}; border-top: 4px solid ${tradPrice ? '#f59e0b' : '#475569'}; border-radius: 8px; padding: 14px 12px; text-align: center; position: relative; transition: all 0.2s;">
+            <div style="font-size: 11px; color: #94a3b8; text-transform: uppercase; font-weight: 700; letter-spacing: 0.05em; margin-bottom: 8px;">🧺 Pasar Tradisional</div>
+            <div style="font-size: 16px; font-weight: 700; font-family: 'JetBrains Mono', monospace; color: ${tradPrice ? '#f59e0b' : '#64748b'};">${tradPrice ? formatPrice(tradPrice) : 'Tidak ada data'}</div>
+          </div>
+          
+          <!-- Pasar Modern -->
+          <div style="background: ${modPrice ? 'rgba(236, 72, 153, 0.04)' : 'rgba(255, 255, 255, 0.01)'}; border: 1px solid ${modPrice ? 'rgba(236, 72, 153, 0.15)' : 'rgba(255, 255, 255, 0.05)'}; border-top: 4px solid ${modPrice ? '#ec4899' : '#475569'}; border-radius: 8px; padding: 14px 12px; text-align: center; position: relative; transition: all 0.2s;">
+            <div style="font-size: 11px; color: #94a3b8; text-transform: uppercase; font-weight: 700; letter-spacing: 0.05em; margin-bottom: 8px;">🛒 Pasar Modern</div>
+            <div style="font-size: 16px; font-weight: 700; font-family: 'JetBrains Mono', monospace; color: ${modPrice ? '#ec4899' : '#64748b'};">${modPrice ? formatPrice(modPrice) : 'Tidak ada data'}</div>
+          </div>
+          
+        </div>
+      </div>
+    `;
+  }
 
   panel.classList.add('active');
   panel.innerHTML = `
@@ -416,7 +675,7 @@ function showCommodityDetail(commodity) {
         <div>
           <h3 style="font-size:18px;font-weight:700">${card.icon} ${commodity}</h3>
           <span class="text-muted text-sm">Kategori: ${card.category} | Status: 
-            <span class="status-badge ${card.status}">${card.status === 'critical' ? '🔴 Kritis' : card.status === 'warning' ? '🟡 Waspada' : '🟢 Aman'}</span>
+            <span class="status-badge ${card.latestPrice === 0 ? 'no-data' : card.status}">${card.latestPrice === 0 ? '⚪ Data Kosong' : card.status === 'critical' ? '🔴 Kritis' : card.status === 'warning' ? '🟡 Waspada' : '🟢 Aman'}</span>
           </span>
         </div>
         <button class="chart-btn" onclick="selectCommodity('${commodity}')">✕ Tutup</button>
@@ -426,25 +685,25 @@ function showCommodityDetail(commodity) {
           <div class="kpi-label">Harga Terakhir</div>
           <div class="kpi-value teal" style="font-size:20px">${formatPrice(card.latestPrice)}</div>
         </div>
-        <div class="kpi-card ${card.totalChange > 20 ? 'red' : 'blue'}">
-          <div class="kpi-label">Perubahan 3 Tahun</div>
-          <div class="kpi-value ${card.totalChange > 20 ? 'red' : 'blue'}" style="font-size:20px">${formatChange(card.totalChange)}</div>
+        <div class="kpi-card ${card.latestPrice === 0 ? 'neutral' : (card.totalChange > 20 ? 'red' : 'blue')}">
+          <div class="kpi-label">Total Perubahan</div>
+          <div class="kpi-value ${card.latestPrice === 0 ? 'neutral' : (card.totalChange > 20 ? 'red' : 'blue')}" style="font-size:20px">${card.latestPrice === 0 ? '-' : formatChange(card.totalChange)}</div>
         </div>
-        <div class="kpi-card ${card.cv2025 > 15 ? 'red' : 'yellow'}">
-          <div class="kpi-label">Volatilitas 2025 (CV)</div>
-          <div class="kpi-value ${card.cv2025 > 15 ? 'red' : 'yellow'}" style="font-size:20px">${card.cv2025}%</div>
+        <div class="kpi-card ${card.latestPrice === 0 ? 'neutral' : (card.cvLatest > 15 ? 'red' : 'yellow')}">
+          <div class="kpi-label">Volatilitas Terbaru (CV)</div>
+          <div class="kpi-value ${card.latestPrice === 0 ? 'neutral' : (card.cvLatest > 15 ? 'red' : 'yellow')}" style="font-size:20px">${card.latestPrice === 0 ? '-' : `${card.cvLatest}%`}</div>
         </div>
         <div class="kpi-card purple">
           <div class="kpi-label">Anomali (90 Hari)</div>
-          <div class="kpi-value purple" style="font-size:20px">${card.recentAnomalies}</div>
+          <div class="kpi-value purple" style="font-size:20px">${card.latestPrice === 0 ? '-' : card.recentAnomalies}</div>
         </div>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px" class="mt-2">
         <div>
           <h4 class="mb-1">📊 Volatilitas Per Tahun</h4>
-          <div class="stat-row"><span class="stat-label">2023</span><span class="stat-value">${vol['2023']}%</span></div>
-          <div class="stat-row"><span class="stat-label">2024</span><span class="stat-value">${vol['2024']}%</span></div>
-          <div class="stat-row"><span class="stat-label">2025</span><span class="stat-value">${vol['2025']}%</span></div>
+          ${Object.keys(vol).filter(k => !isNaN(k)).sort().map(year => `
+            <div class="stat-row"><span class="stat-label">${year}</span><span class="stat-value">${vol[year]}%</span></div>
+          `).join('')}
         </div>
         <div>
           <h4 class="mb-1">⚠️ Anomali Terdeteksi</h4>
@@ -462,8 +721,236 @@ function showCommodityDetail(commodity) {
           }
         </div>
       </div>
+      ${supplyChainHtml}
     </div>
   `;
+}
+
+// ── Analisis Komparatif Regional & Margin Rantai Pasok (Tier 2/3) ──
+function renderRegionalAnalysis(commodity) {
+  const card = DATA.commodityCards.find(c => c.commodity === commodity) || { icon: '📦' };
+  const icon = card.icon;
+
+  // Update subtitle
+  const subtitleEl = document.getElementById('regional-analysis-subtitle');
+  if (subtitleEl) {
+    subtitleEl.innerHTML = `Perbandingan harga antar daerah utama dan analisis margin rantai pasok untuk <strong>${icon} ${commodity}</strong>`;
+  }
+
+  // 1. A. Peta Disparitas Harga (3-Column Comparison Grid)
+  const regionalData = DATA.regional[commodity] || {};
+  const regions = ['Banda Aceh', 'Lhokseumawe', 'Meulaboh'];
+  let prices = {};
+  let changes = {};
+  let cvs = {};
+
+  regions.forEach(r => {
+    const rData = regionalData[r];
+    if (rData && rData.prices && rData.prices.length > 0) {
+      prices[r] = rData.latestPrice;
+      cvs[r] = rData.cv;
+      const histPrices = rData.prices;
+      const prevPrice = histPrices.length >= 30 ? histPrices[histPrices.length - 30] : histPrices[0];
+      changes[r] = prevPrice ? ((rData.latestPrice - prevPrice) / prevPrice * 100) : 0;
+    } else {
+      prices[r] = null;
+      changes[r] = 0;
+      cvs[r] = 0;
+    }
+  });
+
+  // Calculate disparity alerts
+  let disparityAlerts = {};
+  regions.forEach(r => {
+    if (prices[r]) {
+      const otherPrices = regions.filter(o => o !== r).map(o => prices[o]).filter(p => p !== null && p > 0);
+      if (otherPrices.length > 0) {
+        const avgOthers = otherPrices.reduce((sum, val) => sum + val, 0) / otherPrices.length;
+        if (prices[r] > avgOthers * 1.15) {
+          disparityAlerts[r] = '🔴 Gangguan Distribusi';
+        } else if (prices[r] > avgOthers * 1.08) {
+          disparityAlerts[r] = '⚠️ Disparitas Tinggi';
+        }
+      }
+    }
+  });
+
+  let disparityHtml = `
+    <h3 style="font-size: 15px; font-weight: 700; margin: 0 0 16px 0; display: flex; align-items: center; justify-content: space-between; color: #f1f5f9; border-bottom: 1px solid rgba(255,255,255,0.06); padding-bottom: 10px;">
+      <span>📊 Perbandingan Harga Antar Daerah</span>
+      <span style="font-size: 11px; font-weight: normal; background: rgba(255,255,255,0.06); padding: 3px 8px; border-radius: 12px; color: #94a3b8;">Tren MoM</span>
+    </h3>
+    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; flex: 1;">
+  `;
+
+  regions.forEach(r => {
+    const priceVal = prices[r];
+    const pctChange = changes[r];
+    const cvVal = cvs[r];
+    const alertText = disparityAlerts[r];
+    
+    // Highlight if selected in the navbar
+    const isSelectedRegion = (r === selectedRegion);
+    const borderStyle = isSelectedRegion 
+      ? 'border: 2px solid #eab308; box-shadow: 0 0 12px rgba(234, 179, 8, 0.15);' 
+      : 'border: 1px solid rgba(255,255,255,0.06);';
+    
+    const changeText = pctChange >= 0 ? `▲ +${pctChange.toFixed(1)}%` : `▼ ${pctChange.toFixed(1)}%`;
+    const changeColor = pctChange > 5 ? '#ef4444' : (pctChange < -5 ? '#10b981' : '#cbd5e1');
+    
+    disparityHtml += `
+      <div style="background: rgba(30, 41, 59, 0.3); border-radius: 8px; padding: 16px 10px; display: flex; flex-direction: column; justify-content: space-between; min-height: 180px; position: relative; transition: all 0.2s; ${borderStyle}">
+        ${isSelectedRegion ? `<span style="position: absolute; top: -8px; left: 50%; transform: translateX(-50%); font-size: 8px; font-weight: bold; background: #eab308; color: #0f172a; padding: 1px 6px; border-radius: 8px; text-transform: uppercase; z-index: 10;">Daerah Aktif</span>` : ''}
+        <div>
+          <div style="font-size: 11px; color: #94a3b8; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; text-align: center; margin-bottom: 8px;">📍 ${r}</div>
+          <div style="font-size: 16px; font-weight: 700; color: #f8fafc; font-family: 'JetBrains Mono', monospace; text-align: center; margin-top: 4px;">
+            ${priceVal ? formatPrice(priceVal) : '<span style="color: #64748b; font-size: 11px; font-weight: normal;">Tidak ada data</span>'}
+          </div>
+        </div>
+        <div style="text-align: center; margin-top: 12px; display: flex; flex-direction: column; gap: 4px; align-items: center;">
+          <span style="font-size: 13px; font-weight: 700; color: ${changeColor};">${priceVal ? changeText : '-'}</span>
+          <span style="font-size: 9px; color: #64748b;">CV: ${priceVal ? cvVal + '%' : '-'}</span>
+        </div>
+        ${alertText ? `
+          <div style="margin-top: 10px; font-size: 9px; font-weight: bold; background: ${alertText.includes('Gangguan') ? 'rgba(239, 68, 68, 0.15)' : 'rgba(245, 158, 11, 0.15)'}; color: ${alertText.includes('Gangguan') ? '#ef4444' : '#f59e0b'}; padding: 3px 4px; border-radius: 4px; text-align: center; border: 1px solid ${alertText.includes('Gangguan') ? 'rgba(239, 68, 68, 0.2)' : 'rgba(245, 158, 11, 0.2)'};">
+             ${alertText}
+          </div>
+        ` : ''}
+      </div>
+    `;
+  });
+
+  disparityHtml += `
+    </div>
+    <div style="margin-top: 12px; font-size: 10px; color: #64748b; text-align: center; font-style: italic; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 8px; margin-bottom: 0;">
+      *Disparitas dihitung berdasarkan perbandingan deviasi harga antar daerah secara otomatis.
+    </div>
+  `;
+  
+  const dispEl = document.getElementById('card-regional-disparity');
+  if (dispEl) dispEl.innerHTML = disparityHtml;
+
+
+  // 2. B. Price Source Margin Analysis (Markup Chain Flow)
+  let sourceData = DATA.priceBySource[commodity] || {};
+  if (selectedRegion && selectedRegion !== 'aggregated') {
+    sourceData = sourceData[selectedRegion] || {};
+  } else {
+    sourceData = sourceData['aggregated'] || {};
+  }
+  const prodPrice = sourceData['Produsen'] ? sourceData['Produsen'].latestPrice : null;
+  const bigPrice = sourceData['Pedagang Besar'] ? sourceData['Pedagang Besar'].latestPrice : null;
+  const tradPrice = sourceData['Pasar Tradisional'] ? sourceData['Pasar Tradisional'].latestPrice : null;
+
+  const hasProd = prodPrice !== null && prodPrice > 0;
+  const hasBig = bigPrice !== null && bigPrice > 0;
+  const hasTrad = tradPrice !== null && tradPrice > 0;
+
+  let marginHtml = `
+    <h3 style="font-size: 15px; font-weight: 700; margin: 0 0 16px 0; color: #f1f5f9; border-bottom: 1px solid rgba(255,255,255,0.06); padding-bottom: 10px;">
+      <span>⛓️ Margin Rantai Pasok & Markup Flow</span>
+    </h3>
+    <div style="display: flex; flex-direction: column; justify-content: space-between; flex: 1; gap: 16px;">
+      
+      <!-- Visual Chain Flow -->
+      <div style="display: flex; align-items: center; justify-content: space-between; background: rgba(30, 41, 59, 0.2); border: 1px solid rgba(255,255,255,0.04); border-radius: 12px; padding: 20px 10px; position: relative;">
+  `;
+  
+  // Node 1: Produsen
+  marginHtml += `
+    <div style="text-align: center; flex: 1;">
+      <div style="font-size: 9px; color: #94a3b8; font-weight: 700; text-transform: uppercase;">🌾 Produsen</div>
+      <div style="font-size: 13px; font-weight: 700; color: ${hasProd ? '#10b981' : '#64748b'}; font-family: 'JetBrains Mono', monospace; margin-top: 4px;">
+        ${hasProd ? formatPrice(prodPrice) : 'Tidak ada data'}
+      </div>
+    </div>
+  `;
+  
+  // Connector 1
+  if (hasProd && hasBig) {
+    const m1 = ((bigPrice - prodPrice) / prodPrice * 100).toFixed(1);
+    marginHtml += `
+      <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; flex: 0.8; position: relative;">
+        <span style="font-size: 9px; font-weight: 700; background: rgba(59, 130, 246, 0.15); color: #3b82f6; border: 1px solid rgba(59, 130, 246, 0.2); padding: 1px 5px; border-radius: 8px; z-index: 2;">+${m1}%</span>
+        <div style="width: 100%; height: 2px; background: linear-gradient(to right, #10b981, #14b8a6); position: absolute; top: 50%; transform: translateY(-50%); z-index: 1;"></div>
+      </div>
+    `;
+  } else {
+    marginHtml += `
+      <div style="display: flex; align-items: center; justify-content: center; flex: 0.8; position: relative;">
+        <div style="width: 100%; height: 2px; background: rgba(255,255,255,0.05); border-style: dashed; border-width: 1px;"></div>
+      </div>
+    `;
+  }
+  
+  // Node 2: Pedagang Besar
+  marginHtml += `
+    <div style="text-align: center; flex: 1;">
+      <div style="font-size: 9px; color: #94a3b8; font-weight: 700; text-transform: uppercase;">🏢 P. Besar</div>
+      <div style="font-size: 13px; font-weight: 700; color: ${hasBig ? '#14b8a6' : '#64748b'}; font-family: 'JetBrains Mono', monospace; margin-top: 4px;">
+        ${hasBig ? formatPrice(bigPrice) : 'Tidak ada data'}
+      </div>
+    </div>
+  `;
+  
+  // Connector 2
+  if (hasBig && hasTrad) {
+    const m2 = ((tradPrice - bigPrice) / bigPrice * 100).toFixed(1);
+    marginHtml += `
+      <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; flex: 0.8; position: relative;">
+        <span style="font-size: 9px; font-weight: 700; background: rgba(245, 158, 11, 0.15); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.2); padding: 1px 5px; border-radius: 8px; z-index: 2;">+${m2}%</span>
+        <div style="width: 100%; height: 2px; background: linear-gradient(to right, #14b8a6, #f59e0b); position: absolute; top: 50%; transform: translateY(-50%); z-index: 1;"></div>
+      </div>
+    `;
+  } else {
+    marginHtml += `
+      <div style="display: flex; align-items: center; justify-content: center; flex: 0.8; position: relative;">
+        <div style="width: 100%; height: 2px; background: rgba(255,255,255,0.05); border-style: dashed; border-width: 1px;"></div>
+      </div>
+    `;
+  }
+  
+  // Node 3: Pasar Tradisional
+  marginHtml += `
+    <div style="text-align: center; flex: 1;">
+      <div style="font-size: 9px; color: #94a3b8; font-weight: 700; text-transform: uppercase;">🧺 P. Tradisional</div>
+      <div style="font-size: 13px; font-weight: 700; color: ${hasTrad ? '#f59e0b' : '#64748b'}; font-family: 'JetBrains Mono', monospace; margin-top: 4px;">
+        ${hasTrad ? formatPrice(tradPrice) : 'Tidak ada data'}
+      </div>
+    </div>
+  `;
+  
+  marginHtml += `
+      </div>
+  `;
+  
+  // Summary Card (Total Margin)
+  if (hasProd && hasTrad) {
+    const totalM = ((tradPrice - prodPrice) / prodPrice * 100).toFixed(1);
+    marginHtml += `
+      <div style="background: linear-gradient(135deg, rgba(244, 63, 94, 0.08) 0%, rgba(15, 23, 42, 0.4) 100%); border: 1px solid rgba(244, 63, 94, 0.2); border-radius: 8px; padding: 12px; display: flex; align-items: center; justify-content: space-between;">
+        <div style="text-align: left;">
+          <span style="font-size: 11px; color: #f43f5e; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; display: block;">Total Margin Rantai Pasok</span>
+          <span style="font-size: 9px; color: #64748b; margin-top: 2px; display: block;">Selisih harga tingkat konsumen vs petani</span>
+        </div>
+        <span style="font-size: 18px; font-weight: 800; color: #f43f5e; text-shadow: 0 0 10px rgba(244, 63, 94, 0.2);">+${totalM}%</span>
+      </div>
+    `;
+  } else {
+    marginHtml += `
+      <div style="background: rgba(255, 255, 255, 0.02); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 8px; padding: 12px; text-align: center; display: flex; flex-direction: column; gap: 4px; justify-content: center;">
+        <span style="font-size: 11px; color: #94a3b8; font-weight: 600; text-transform: uppercase;">Margin Total Tidak Tersedia</span>
+        <span style="font-size: 9px; color: #64748b;">Kalkulasi lengkap memerlukan data Produsen & Pasar Tradisional.</span>
+      </div>
+    `;
+  }
+  
+  marginHtml += `
+    </div>
+  `;
+  
+  const margEl = document.getElementById('card-margin-analysis');
+  if (margEl) margEl.innerHTML = marginHtml;
 }
 
 // ── Price Trend Chart ────────────────────────────────────────────
@@ -493,15 +980,7 @@ function renderPriceTrendChart() {
       },
       plugins: {
         legend: {
-          display: true,
-          position: 'top',
-          labels: {
-            color: '#94a3b8',
-            font: { family: 'Inter', size: 11 },
-            boxWidth: 12,
-            padding: 12,
-            usePointStyle: true,
-          },
+          display: false,  // Disabled — replaced by custom sub-commodity pills
         },
         tooltip: {
           backgroundColor: 'rgba(17, 24, 39, 0.95)',
@@ -540,6 +1019,8 @@ function renderPriceTrendChart() {
   });
 
   updatePriceTrendChart();
+  // Render sub-commodity pill row immediately after first chart load
+  renderSubCommodityPills();
 }
 
 function toggleForecast() {
@@ -551,26 +1032,73 @@ function toggleForecast() {
 }
 
 function updatePriceTrendChart(singleCommodity = null) {
-  const ts = DATA.timeseries;
-  const forecasts = DATA.forecasts || {};
+  // Reconstruct timeseries and forecast references for regional support
+  let ts = DATA.timeseries;
+  let forecasts = DATA.forecasts || {};
+
+  if (selectedRegion && selectedRegion !== 'aggregated') {
+    ts = {};
+    for (const [commodity, regDict] of Object.entries(DATA.regional)) {
+      if (regDict[selectedRegion]) {
+        ts[commodity] = {
+          shortName: DATA.commodityCards.find(c => c.commodity === commodity)?.shortName || commodity,
+          category: DATA.commodityCards.find(c => c.commodity === commodity)?.category || '',
+          dates: regDict[selectedRegion].dates,
+          prices: regDict[selectedRegion].prices
+        };
+      }
+    }
+    forecasts = {};
+    for (const [commodity, regFcDict] of Object.entries(DATA.regionalForecasts)) {
+      if (regFcDict[selectedRegion]) {
+        forecasts[commodity] = regFcDict[selectedRegion];
+      }
+    }
+  }
+
+  // ── Determine which commodities to render ──
+  // Priority: selectedCommodities set (multi-select) > singleCommodity (card click) > category filter
+  const useMultiSelect = selectedCommodities.size > 0;
+  const isFocusMode = useMultiSelect ? selectedCommodities.size === 1 : !!singleCommodity;
+
   const datasets = [];
+  const CHART_PALETTE = [
+    '#60a5fa','#f472b6','#34d399','#fbbf24','#a78bfa',
+    '#fb923c','#22d3ee','#e879f9','#86efac','#fda4af'
+  ];
+  // Sorted commodity keys for consistent palette assignment (matches pills)
+  const allKeys = Object.keys(ts).sort();
 
   for (const [commodity, data] of Object.entries(ts)) {
-    if (singleCommodity && commodity !== singleCommodity) continue;
-    if (!singleCommodity && activeCategory !== 'all' && data.category !== activeCategory) continue;
+    // Filter logic
+    if (useMultiSelect) {
+      if (!selectedCommodities.has(commodity)) continue;
+    } else if (singleCommodity) {
+      if (commodity !== singleCommodity) continue;
+    } else {
+      if (activeCategory !== 'all' && data.category !== activeCategory) continue;
+    }
 
-    const color = CATEGORY_COLORS[data.category] || '#94a3b8';
-    
+    // When showing multiple lines (category or multi-select), use palette for distinct colors
+    // When single commodity from card click, use category color
+    const catColor = CATEGORY_COLORS[data.category] || '#94a3b8';
+    const paletteColor = CHART_PALETTE[allKeys.indexOf(commodity) % CHART_PALETTE.length];
+    const showingMultiple = useMultiSelect || (!singleCommodity && activeCategory !== 'all' && 
+      Object.values(ts).filter(d => d.category === activeCategory).length > 1);
+    const color = singleCommodity ? catColor : paletteColor;
+    const lineWidth = (isFocusMode) ? 2.5 : (useMultiSelect ? 2 : 1.5);
+    const showPoints = isFocusMode || useMultiSelect;
+
     // 1. Main historical data
     datasets.push({
       label: data.shortName,
       data: data.dates.map((d, i) => ({ x: d, y: data.prices[i] })),
       borderColor: color,
-      backgroundColor: color + '15',
-      borderWidth: singleCommodity ? 2.5 : 1.5,
-      pointRadius: singleCommodity ? 2 : 0,
+      backgroundColor: color + '18',
+      borderWidth: lineWidth,
+      pointRadius: showPoints ? 1.5 : 0,
       pointHoverRadius: 4,
-      fill: !!singleCommodity,
+      fill: isFocusMode && !useMultiSelect,
       tension: 0.3,
       order: 10
     });
@@ -580,8 +1108,6 @@ function updatePriceTrendChart(singleCommodity = null) {
       const fc = forecasts[commodity];
       const lastHistDate = data.dates[data.dates.length - 1];
       const lastHistPrice = data.prices[data.prices.length - 1];
-
-      // Add a bridge point from the last historical data to the first forecast
       const forecastPoints = [
         { x: lastHistDate, y: lastHistPrice },
         ...fc.dates.map((d, i) => ({ x: d, y: fc.yhat[i] }))
@@ -599,17 +1125,16 @@ function updatePriceTrendChart(singleCommodity = null) {
         order: 5
       });
 
-      // 3. Confidence Interval (Shaded Area)
-      if (singleCommodity) {
+      // 3. Confidence Interval (only in single-focus or single multi-select)
+      if (isFocusMode) {
         const lowerPoints = [
-            { x: lastHistDate, y: lastHistPrice },
-            ...fc.dates.map((d, i) => ({ x: d, y: fc.yhat_lower[i] }))
+          { x: lastHistDate, y: lastHistPrice },
+          ...fc.dates.map((d, i) => ({ x: d, y: fc.yhat_lower[i] }))
         ];
         const upperPoints = [
-            { x: lastHistDate, y: lastHistPrice },
-            ...fc.dates.map((d, i) => ({ x: d, y: fc.yhat_upper[i] }))
+          { x: lastHistDate, y: lastHistPrice },
+          ...fc.dates.map((d, i) => ({ x: d, y: fc.yhat_upper[i] }))
         ];
-
         datasets.push({
           label: `${data.shortName} (Batas Atas)`,
           data: upperPoints,
@@ -620,14 +1145,13 @@ function updatePriceTrendChart(singleCommodity = null) {
           tension: 0.4,
           order: 20
         });
-
         datasets.push({
           label: `${data.shortName} (Batas Bawah)`,
           data: lowerPoints,
           borderColor: 'transparent',
           backgroundColor: color + '10',
           pointRadius: 0,
-          fill: '-1', // Fill between this and the previous dataset (Upper)
+          fill: '-1',
           tension: 0.4,
           order: 21
         });
@@ -639,8 +1163,106 @@ function updatePriceTrendChart(singleCommodity = null) {
   charts.priceTrend.update('none');
 }
 
+// Toggle a single sub-commodity on/off within the multi-select chart
+function toggleTrendCommodity(commodity) {
+  if (selectedCommodities.has(commodity)) {
+    selectedCommodities.delete(commodity);
+  } else {
+    selectedCommodities.add(commodity);
+  }
+  // Re-render pills to reflect checked state
+  renderSubCommodityPills();
+  updatePriceTrendChart();
+}
+
+// Render the checkbox-style sub-commodity pill row below the category filter.
+// Pills always show ALL commodities in the current category.
+// Unchecked = visible (default: all visible), Checked = hidden.
+// EXCEPT when at least one pill is EXPLICITLY shown via selection:
+//   then only checked ones are visible (opt-in mode).
+function renderSubCommodityPills() {
+  const container = document.getElementById('trend-sub-commodity-pills');
+  if (!container) return;
+
+  const ts = DATA.timeseries;
+
+  // When 'all' category, only show pills if the count is manageable (≤ 6)
+  const allCommodities = Object.entries(ts).filter(([, data]) => {
+    return activeCategory === 'all' || data.category === activeCategory;
+  });
+
+  // For 'all' with too many items, hide pill row (category buttons are enough)
+  if (activeCategory === 'all' && allCommodities.length > 6) {
+    container.innerHTML = '';
+    container.style.borderTop = 'none';
+    return;
+  }
+
+  if (allCommodities.length === 0) {
+    container.innerHTML = '';
+    container.style.borderTop = 'none';
+    return;
+  }
+
+  container.style.borderTop = '1px solid rgba(255,255,255,0.05)';
+
+  const CHART_PALETTE = [
+    '#60a5fa','#f472b6','#34d399','#fbbf24','#a78bfa',
+    '#fb923c','#22d3ee','#e879f9','#86efac','#fda4af'
+  ];
+  const sortedKeys = allCommodities.map(([k]) => k).sort();
+
+  // In opt-in mode (some items selected), checked = visible.
+  // In default mode (none selected), all are visible, pills show current state.
+  const hasSelection = selectedCommodities.size > 0;
+
+  const pills = allCommodities.map(([commodity, data]) => {
+    const isSelected = selectedCommodities.has(commodity);
+    // In default mode: all are "on" visually
+    // In selection mode: only selected ones are "on"
+    const isVisible = hasSelection ? isSelected : true;
+    const catColor = CATEGORY_COLORS[data.category] || '#94a3b8';
+    const dotColor = CHART_PALETTE[sortedKeys.indexOf(commodity) % CHART_PALETTE.length];
+
+    const activeStyle = `background:${dotColor}22; border-color:${dotColor}; color:${dotColor};`;
+    const inactiveStyle = `background:rgba(255,255,255,0.03); border-color:rgba(255,255,255,0.08); color:#475569;`;
+
+    return `
+      <button
+        class="sub-pill ${isVisible ? 'checked' : ''}"
+        style="${isVisible ? activeStyle : inactiveStyle}"
+        onclick="toggleTrendCommodity('${commodity}')"
+        title="${isVisible ? 'Klik untuk sembunyikan' : 'Klik untuk tampilkan'} ${data.shortName}"
+      >
+        <span class="sub-pill-dot" style="background:${isVisible ? dotColor : '#334155'};"></span>
+        ${data.shortName}
+      </button>
+    `;
+  }).join('');
+
+  const resetBtn = hasSelection
+    ? `<button onclick="clearTrendSelection()" style="font-size:11px; padding:4px 10px; border-radius:20px; border:1px dashed rgba(239,68,68,0.4); background:rgba(239,68,68,0.08); color:#ef4444; cursor:pointer; margin-left:4px;">↩ Tampilkan Semua</button>`
+    : '';
+
+  container.innerHTML = `
+    <div style="display:flex; flex-wrap:wrap; gap:6px; align-items:center; padding:8px 2px;">
+      ${pills}
+      ${resetBtn}
+    </div>
+  `;
+}
+
+// Clear all multi-selections and go back to category view
+function clearTrendSelection() {
+  selectedCommodities.clear();
+  renderSubCommodityPills();
+  updatePriceTrendChart();
+}
+
 function filterTrendCategory(category) {
   activeCategory = category;
+  // Reset multi-select when switching category
+  selectedCommodities.clear();
   document.querySelectorAll('#trend-category-filter .chart-btn').forEach(btn => {
     btn.classList.toggle('active', btn.dataset.category === category);
   });
@@ -649,6 +1271,7 @@ function filterTrendCategory(category) {
     document.querySelectorAll('.commodity-card').forEach(c => c.classList.remove('selected'));
     document.getElementById('detail-panel').classList.remove('active');
   }
+  renderSubCommodityPills();
   updatePriceTrendChart();
 }
 
@@ -664,16 +1287,16 @@ function renderYoYChart() {
       labels,
       datasets: [
         {
-          label: '2023 → 2024',
-          data: yoy.map(y => y.change_23_24),
+          label: '2024 → 2025',
+          data: yoy.map(y => y.change_24_25),
           backgroundColor: 'rgba(59, 130, 246, 0.7)',
           borderColor: 'rgba(59, 130, 246, 1)',
           borderWidth: 1,
           borderRadius: 4,
         },
         {
-          label: '2024 → 2025',
-          data: yoy.map(y => y.change_24_25),
+          label: '2025 → 2026',
+          data: yoy.map(y => y.change_25_26),
           backgroundColor: 'rgba(239, 68, 68, 0.7)',
           borderColor: 'rgba(239, 68, 68, 1)',
           borderWidth: 1,
@@ -785,8 +1408,9 @@ function renderVolatilityHeatmap() {
   const vol = DATA.volatility;
   const commodities = Object.keys(vol);
 
-  // Sort by 2025 CV descending
-  commodities.sort((a, b) => (vol[b]['2025'] || 0) - (vol[a]['2025'] || 0));
+  // Sort by latest CV descending
+  const maxYear = Object.keys(vol[commodities[0]] || {}).filter(k => !isNaN(k)).sort().reverse()[0] || '2025';
+  commodities.sort((a, b) => (vol[b][maxYear] || 0) - (vol[a][maxYear] || 0));
 
   function cvColor(cv) {
     if (cv > 20) return { bg: 'rgba(239, 68, 68, 0.6)', text: '#fff' };
@@ -800,7 +1424,8 @@ function renderVolatilityHeatmap() {
   // Header row
   html += '<div class="heatmap-row">';
   html += '<div class="heatmap-label"></div>';
-  ['2023', '2024', '2025'].forEach(y => {
+  const years = Object.keys(vol[commodities[0]] || {}).filter(k => !isNaN(k)).sort();
+  years.forEach(y => {
     html += `<div class="heatmap-cell heatmap-header">${y}</div>`;
   });
   html += '</div>';
@@ -809,8 +1434,8 @@ function renderVolatilityHeatmap() {
     const d = vol[commodity];
     html += '<div class="heatmap-row">';
     html += `<div class="heatmap-label" title="${commodity}">${d.shortName}</div>`;
-    ['2023', '2024', '2025'].forEach(y => {
-      const v = d[y];
+    years.forEach(y => {
+      const v = d[y] || 0;
       const c = cvColor(v);
       html += `<div class="heatmap-cell" style="background:${c.bg};color:${c.text};min-width:80px"
                title="${commodity} ${y}: CV=${v}%">${v}%</div>`;
@@ -961,6 +1586,426 @@ function switchSection(sectionId) {
   const target = document.getElementById(sectionId);
   if (target) {
     target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════
+// MODUL G: Spatial Tab — Regional Chart + Arbitrage Advisor
+// ══════════════════════════════════════════════════════════════════
+
+function populateSpatialDropdown() {
+  const select = document.getElementById('spatial-commodity-select');
+  if (!select || !DATA.commodityCards) return;
+  select.innerHTML = DATA.commodityCards.map(c =>
+    `<option value="${c.commodity}" ${c.commodity === spatialCommodity ? 'selected' : ''}>${c.icon} ${c.shortName}</option>`
+  ).join('');
+}
+
+function renderSpatialTab() {
+  renderRegionalAnalysis(spatialCommodity);
+  renderRegionalChart(spatialCommodity);
+  renderArbitrageAdvisor();
+}
+
+function renderRegionalChart(commodity) {
+  const canvas = document.getElementById('chart-regional-comparison');
+  if (!canvas) return;
+
+  // Destroy previous instance
+  if (charts.regionalComparison) {
+    charts.regionalComparison.destroy();
+  }
+
+  const regionalData = DATA.regional[commodity] || {};
+  const regions = ['Banda Aceh', 'Lhokseumawe', 'Meulaboh'];
+  const regionColors = { 'Banda Aceh': '#3b82f6', 'Lhokseumawe': '#f59e0b', 'Meulaboh': '#10b981' };
+
+  const datasets = regions.map(r => {
+    const rData = regionalData[r];
+    if (!rData || !rData.dates || !rData.prices) return null;
+    return {
+      label: r,
+      data: rData.dates.map((d, i) => ({ x: d, y: rData.prices[i] })),
+      borderColor: regionColors[r],
+      backgroundColor: regionColors[r] + '15',
+      borderWidth: 2,
+      pointRadius: 0,
+      pointHoverRadius: 4,
+      fill: false,
+      tension: 0.3,
+    };
+  }).filter(Boolean);
+
+  charts.regionalComparison = new Chart(canvas.getContext('2d'), {
+    type: 'line',
+    data: { datasets },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: {
+          position: 'top',
+          labels: { color: '#94a3b8', font: { family: 'Inter', size: 11 }, usePointStyle: true, padding: 12 },
+        },
+        tooltip: {
+          backgroundColor: 'rgba(17, 24, 39, 0.95)',
+          titleColor: '#f1f5f9',
+          bodyColor: '#94a3b8',
+          borderColor: 'rgba(255,255,255,0.1)',
+          borderWidth: 1,
+          bodyFont: { family: 'JetBrains Mono', size: 12 },
+          callbacks: { label: (ctx) => `${ctx.dataset.label}: ${formatPrice(ctx.parsed.y)}` },
+        },
+      },
+      scales: {
+        x: {
+          type: 'time',
+          time: { unit: 'month', displayFormats: { month: 'MMM yy' } },
+          grid: { color: 'rgba(255,255,255,0.04)' },
+          ticks: { color: '#64748b', font: { size: 10 } },
+        },
+        y: {
+          grid: { color: 'rgba(255,255,255,0.04)' },
+          ticks: { color: '#64748b', font: { size: 10 }, callback: (v) => formatPriceShort(v) },
+        },
+      },
+    },
+  });
+}
+
+function renderArbitrageAdvisor() {
+  const container = document.getElementById('arbitrage-advisor-grid');
+  if (!container) return;
+
+  const regions = ['Banda Aceh', 'Lhokseumawe', 'Meulaboh'];
+  const opportunities = [];
+
+  // Scan ALL commodities for price disparity > 30%
+  (DATA.commodityCards || []).forEach(card => {
+    const regData = DATA.regional[card.commodity] || {};
+    const prices = {};
+    regions.forEach(r => {
+      if (regData[r] && regData[r].latestPrice > 0) {
+        prices[r] = regData[r].latestPrice;
+      }
+    });
+
+    const validRegions = Object.keys(prices);
+    if (validRegions.length < 2) return;
+
+    // Find max and min
+    let maxRegion = validRegions[0], minRegion = validRegions[0];
+    validRegions.forEach(r => {
+      if (prices[r] > prices[maxRegion]) maxRegion = r;
+      if (prices[r] < prices[minRegion]) minRegion = r;
+    });
+
+    const diff = prices[maxRegion] - prices[minRegion];
+    const diffPct = (diff / prices[minRegion]) * 100;
+
+    if (diffPct > 30) {
+      opportunities.push({
+        commodity: card.commodity,
+        shortName: card.shortName,
+        icon: card.icon,
+        maxRegion,
+        minRegion,
+        maxPrice: prices[maxRegion],
+        minPrice: prices[minRegion],
+        diffPct,
+        diffRupiah: diff,
+      });
+    }
+  });
+
+  // Sort by disparity descending
+  opportunities.sort((a, b) => b.diffPct - a.diffPct);
+
+  if (opportunities.length === 0) {
+    container.innerHTML = `
+      <div class="glass-card arbitrage-no-data">
+        <p style="font-size:28px; margin-bottom:12px;">✅</p>
+        <p style="font-size:16px; font-weight:600; color:var(--status-normal); margin-bottom:6px;">Tidak Ada Disparitas Ekstrem</p>
+        <p>Seluruh komoditas memiliki selisih harga antar daerah di bawah 30%. Distribusi berjalan baik.</p>
+      </div>`;
+    return;
+  }
+
+  container.innerHTML = `<div class="arbitrage-grid">` + opportunities.map(o => {
+    const isExtreme = o.diffPct > 60;
+    const cardClass = isExtreme ? 'extreme' : '';
+    const badgeColor = isExtreme ? 'var(--status-critical)' : 'var(--status-warning)';
+    const badgeBg = isExtreme ? 'rgba(239,68,68,0.15)' : 'rgba(245,158,11,0.15)';
+    const badgeText = isExtreme ? '🔴 KRITIS' : '🟡 DISPARITAS';
+
+    return `
+      <div class="arbitrage-card ${cardClass}">
+        <div class="arbitrage-header">
+          <span style="font-size:15px; font-weight:700;">${o.icon} ${o.shortName}</span>
+          <span class="arbitrage-badge" style="color:${badgeColor}; background:${badgeBg}; border:1px solid ${badgeColor}30;">${badgeText}</span>
+        </div>
+        <div style="display:flex; gap:12px; margin-bottom:8px;">
+          <div style="flex:1; text-align:center; padding:10px; background:rgba(239,68,68,0.06); border-radius:8px; border:1px solid rgba(239,68,68,0.1);">
+            <div style="font-size:9px; color:var(--text-muted); font-weight:700; text-transform:uppercase;">📍 ${o.maxRegion} (Termahal)</div>
+            <div style="font-size:15px; font-weight:700; color:var(--status-critical); font-family:'JetBrains Mono',monospace; margin-top:4px;">${formatPrice(o.maxPrice)}</div>
+          </div>
+          <div style="flex:1; text-align:center; padding:10px; background:rgba(34,197,94,0.06); border-radius:8px; border:1px solid rgba(34,197,94,0.1);">
+            <div style="font-size:9px; color:var(--text-muted); font-weight:700; text-transform:uppercase;">📍 ${o.minRegion} (Termurah)</div>
+            <div style="font-size:15px; font-weight:700; color:var(--status-normal); font-family:'JetBrains Mono',monospace; margin-top:4px;">${formatPrice(o.minPrice)}</div>
+          </div>
+        </div>
+        <div style="text-align:center; font-size:18px; font-weight:800; color:${badgeColor}; margin:8px 0;">
+          Selisih: +${o.diffPct.toFixed(1)}% (${formatPrice(o.diffRupiah)})
+        </div>
+        <div class="arbitrage-recommendation">
+          <strong>💡 REKOMENDASI ARBITRASE:</strong><br>
+          Harga ${o.shortName} di ${o.maxRegion} (${formatPrice(o.maxPrice)}) jauh lebih tinggi dibanding ${o.minRegion} (${formatPrice(o.minPrice)}). Selisih: +${o.diffPct.toFixed(1)}%.<br>
+          <strong>⚡ Aksi:</strong> Mobilisasi stok dari ${o.minRegion} ke ${o.maxRegion} untuk menekan disparitas harga.
+        </div>
+      </div>`;
+  }).join('') + `</div>`;
+}
+
+// ══════════════════════════════════════════════════════════════════
+// MODUL H: Margin Health Tab — Supply Chain for ALL commodities
+// ══════════════════════════════════════════════════════════════════
+
+function renderMarginHealthTab() {
+  const summaryContainer = document.getElementById('margin-summary-cards');
+  const gridContainer = document.getElementById('margin-health-grid');
+  if (!summaryContainer || !gridContainer) return;
+
+  let healthy = 0, warning = 0, danger = 0;
+  const cards = [];
+
+  (DATA.commodityCards || []).forEach(card => {
+    let src = DATA.priceBySource[card.commodity] || {};
+    if (selectedRegion && selectedRegion !== 'aggregated') {
+      src = src[selectedRegion] || {};
+    } else {
+      src = src['aggregated'] || {};
+    }
+    const prodPrice = src['Produsen'] ? src['Produsen'].latestPrice : null;
+    const bigPrice = src['Pedagang Besar'] ? src['Pedagang Besar'].latestPrice : null;
+    const tradPrice = src['Pasar Tradisional'] ? src['Pasar Tradisional'].latestPrice : null;
+    const modPrice = src['Pasar Modern'] ? src['Pasar Modern'].latestPrice : null;
+
+    const hasProd = prodPrice && prodPrice > 0;
+    const hasBig = bigPrice && bigPrice > 0;
+    const hasTrad = tradPrice && tradPrice > 0;
+    const hasMod = modPrice && modPrice > 0;
+
+    let healthStatus = 'no-data';
+    let markup1 = null;   // Produsen → Pedagang Besar
+    let markup2 = null;   // Pedagang Besar → Pasar Tradisional
+    let markup3 = null;   // Pedagang Besar → Pasar Modern (SETINGKAT dengan markup2!)
+    let totalTrad = null;  // Produsen → Pasar Tradisional (jalur tradisional)
+    let totalMod = null;   // Produsen → Pasar Modern (jalur modern)
+
+    if (hasProd && hasBig) markup1 = ((bigPrice - prodPrice) / prodPrice * 100);
+    if (hasBig && hasTrad) markup2 = ((tradPrice - bigPrice) / bigPrice * 100);
+    if (hasBig && hasMod)  markup3 = ((modPrice - bigPrice) / bigPrice * 100);
+    if (hasProd && hasTrad) totalTrad = ((tradPrice - prodPrice) / prodPrice * 100);
+    if (hasProd && hasMod)  totalMod = ((modPrice - prodPrice) / prodPrice * 100);
+
+    // Health status: gunakan margin TERBURUK (max) dari kedua jalur
+    const maxTotal = Math.max(totalTrad || 0, totalMod || 0);
+    if (totalTrad !== null || totalMod !== null) {
+      if (maxTotal > 40) { healthStatus = 'danger'; danger++; }
+      else if (maxTotal > 20) { healthStatus = 'warning'; warning++; }
+      else { healthStatus = 'good'; healthy++; }
+    }
+
+    cards.push({ ...card, prodPrice, bigPrice, tradPrice, modPrice, hasProd, hasBig, hasTrad, hasMod, healthStatus, markup1, markup2, markup3, totalTrad, totalMod, maxTotal });
+  });
+
+  // Sort: danger first
+  const order = { danger: 0, warning: 1, good: 2, 'no-data': 3 };
+  cards.sort((a, b) => (order[a.healthStatus] ?? 3) - (order[b.healthStatus] ?? 3));
+
+  // Summary KPI cards
+  summaryContainer.innerHTML = `
+    <div class="kpi-card green">
+      <div class="kpi-label">Rantai Pasok Sehat</div>
+      <div class="kpi-value green">${healthy}</div>
+      <div class="kpi-detail">Markup &lt;20% — distribusi efisien</div>
+    </div>
+    <div class="kpi-card yellow">
+      <div class="kpi-label">Perlu Perhatian</div>
+      <div class="kpi-value yellow">${warning}</div>
+      <div class="kpi-detail">Markup 20-40% — inefisiensi distribusi</div>
+    </div>
+    <div class="kpi-card red">
+      <div class="kpi-label">Tidak Wajar</div>
+      <div class="kpi-value red">${danger}</div>
+      <div class="kpi-detail">Markup &gt;40% — potensi penimbunan</div>
+    </div>`;
+
+  // Color helper
+  function mColor(val) {
+    if (val === null) return '#64748b';
+    return val > 20 ? '#ef4444' : val > 10 ? '#f59e0b' : '#3b82f6';
+  }
+  function mkBadge(val, color) {
+    const txt = val !== null ? (val >= 0 ? '+' : '') + val.toFixed(1) + '%' : '—';
+    return `<span class="margin-tl-badge" style="color:${color}; background:${color}15; border:1px solid ${color}30;">${txt}</span>`;
+  }
+  function statusColor(val) {
+    if (val === null) return '#64748b';
+    return val > 40 ? '#ef4444' : val > 20 ? '#f59e0b' : '#10b981';
+  }
+  function barWidth(val) {
+    if (val === null || val <= 0) return 0;
+    return Math.min(val / 100 * 100, 100);  // cap at 100%
+  }
+
+  // Margin cards grid
+  gridContainer.innerHTML = cards.map(c => {
+    const healthClass = c.healthStatus === 'good' ? 'health-good' : c.healthStatus === 'warning' ? 'health-warning' : c.healthStatus === 'danger' ? 'health-danger' : '';
+    const badgeClass = c.healthStatus === 'good' ? 'good' : c.healthStatus === 'warning' ? 'warning' : c.healthStatus === 'danger' ? 'danger' : '';
+    const badgeLabel = c.healthStatus === 'good' ? 'SEHAT' : c.healthStatus === 'warning' ? 'WASPADA' : c.healthStatus === 'danger' ? 'TIDAK WAJAR' : 'NO DATA';
+
+    const m1c = mColor(c.markup1);
+    const m2c = mColor(c.markup2);
+    const m3c = mColor(c.markup3);
+
+    // Summary footer with severity bars
+    let footerHtml = '';
+    if (c.totalTrad !== null || c.totalMod !== null) {
+      const tradColor = statusColor(c.totalTrad);
+      const modColor = statusColor(c.totalMod);
+      footerHtml = `
+        <div class="margin-summary-footer">
+          <div class="margin-summary-channel">
+            <div class="margin-summary-channel-label">Jalur Tradisional</div>
+            <div class="margin-summary-channel-value" style="color:${tradColor}">${c.totalTrad !== null ? '+' + c.totalTrad.toFixed(1) + '%' : '—'}</div>
+            <div class="margin-severity-bar">
+              <div class="margin-severity-fill" style="width:${barWidth(c.totalTrad)}%; background:${tradColor};"></div>
+            </div>
+          </div>
+          <div class="margin-summary-channel">
+            <div class="margin-summary-channel-label">Jalur Modern</div>
+            <div class="margin-summary-channel-value" style="color:${modColor}">${c.totalMod !== null ? '+' + c.totalMod.toFixed(1) + '%' : '—'}</div>
+            <div class="margin-severity-bar">
+              <div class="margin-severity-fill" style="width:${barWidth(c.totalMod)}%; background:${modColor};"></div>
+            </div>
+          </div>
+        </div>`;
+    }
+
+    return `
+      <div class="margin-card ${healthClass}">
+        <div class="margin-card-header">
+          <div class="margin-card-title">${c.icon} ${c.shortName}</div>
+          <span class="health-badge ${badgeClass}">${badgeLabel}</span>
+        </div>
+
+        <div class="margin-timeline">
+          <!-- Node: Produsen -->
+          <div class="margin-tl-node level-produsen">
+            <span class="margin-tl-label">Produsen</span>
+            <span class="margin-tl-price" style="color:${c.hasProd ? '#10b981' : '#64748b'}">${c.hasProd ? formatPrice(c.prodPrice) : '—'}</span>
+          </div>
+
+          <!-- Connector -->
+          <div class="margin-tl-connector">
+            ${mkBadge(c.markup1, m1c)}
+          </div>
+
+          <!-- Node: Pedagang Besar -->
+          <div class="margin-tl-node level-pedagang">
+            <span class="margin-tl-label">Pedagang Besar</span>
+            <span class="margin-tl-price" style="color:${c.hasBig ? '#14b8a6' : '#64748b'}">${c.hasBig ? formatPrice(c.bigPrice) : '—'}</span>
+          </div>
+
+          <!-- Fork: two retail channels side-by-side -->
+          <div class="margin-fork-wrapper">
+            <div class="margin-fork-label">Distribusi Retail</div>
+            <div class="margin-fork-grid">
+              <div class="margin-fork-panel panel-trad">
+                <div class="margin-fork-panel-label">Pasar Tradisional</div>
+                <div class="margin-fork-panel-price" style="color:${c.hasTrad ? '#f59e0b' : '#64748b'}">${c.hasTrad ? formatPrice(c.tradPrice) : '—'}</div>
+                <div class="margin-fork-panel-markup" style="color:${m2c}; background:${m2c}15; border:1px solid ${m2c}30;">${c.markup2 !== null ? (c.markup2 >= 0 ? '+' : '') + c.markup2.toFixed(1) + '%' : '—'}</div>
+              </div>
+              <div class="margin-fork-panel panel-mod">
+                <div class="margin-fork-panel-label">Pasar Modern</div>
+                <div class="margin-fork-panel-price" style="color:${c.hasMod ? '#ec4899' : '#64748b'}">${c.hasMod ? formatPrice(c.modPrice) : '—'}</div>
+                <div class="margin-fork-panel-markup" style="color:${m3c}; background:${m3c}15; border:1px solid ${m3c}30;">${c.markup3 !== null ? (c.markup3 >= 0 ? '+' : '') + c.markup3.toFixed(1) + '%' : '—'}</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        ${footerHtml}
+
+        ${c.healthStatus === 'danger' ? `
+          <div class="margin-warning-text">
+            🚨 Potensi penimbunan/spekulasi — Perlu investigasi Satgas Pangan
+          </div>` : ''}
+      </div>`;
+  }).join('');
+}
+
+// ══════════════════════════════════════════════════════════════════
+// MODUL I: SVG Map Aceh — Update glow based on anomalies
+// ══════════════════════════════════════════════════════════════════
+
+function updateSVGMap() {
+  if (!DATA || !DATA.anomalies || !mapInstance) return;
+
+  // Aggregate anomaly severity per region from recent anomalies
+  const regionStatus = { 'Banda Aceh': 'normal', 'Lhokseumawe': 'normal', 'Meulaboh': 'normal' };
+
+  // Check recent anomalies (last 30 days) for each region
+  const recentAnomalies = DATA.anomalies.slice(0, 100);
+  recentAnomalies.forEach(a => {
+    if (a.daerah && regionStatus[a.daerah] !== undefined) {
+      if (a.z_score > 3) regionStatus[a.daerah] = 'critical';
+      else if (a.z_score > 2 && regionStatus[a.daerah] !== 'critical') regionStatus[a.daerah] = 'warning';
+    }
+  });
+
+  // Also check alertFeed for regional anomalies
+  (DATA.alertFeed || []).forEach(a => {
+    if (a.daerah && regionStatus[a.daerah] !== undefined && a.severity !== 'prediction') {
+      if (a.severity === 'critical') regionStatus[a.daerah] = 'critical';
+      else if (a.severity === 'warning' && regionStatus[a.daerah] !== 'critical') regionStatus[a.daerah] = 'warning';
+    }
+  });
+
+  // Apply Leaflet marker class updates dynamically
+  Object.entries(regionStatus).forEach(([cityName, status]) => {
+    const marker = mapMarkers[cityName];
+    if (!marker) return;
+
+    let statusClass = 'normal';
+    if (status === 'critical') statusClass = 'critical';
+    else if (status === 'warning') statusClass = 'warning';
+
+    // Update marker icon
+    const customIcon = L.divIcon({
+      className: `map-pulse-marker ${statusClass}`,
+      html: `<div class="pulse-ring"></div><div class="pulse-dot"></div><span class="marker-label">${cityName}</span>`,
+      iconSize: [20, 20],
+      iconAnchor: [10, 10]
+    });
+
+    marker.setIcon(customIcon);
+  });
+
+  // Update summary text
+  const summaryEl = document.getElementById('map-status-summary');
+  if (summaryEl) {
+    const critical = Object.values(regionStatus).filter(s => s === 'critical').length;
+    const warn = Object.values(regionStatus).filter(s => s === 'warning').length;
+    const normal = Object.values(regionStatus).filter(s => s === 'normal').length;
+    summaryEl.innerHTML = `
+      <span style="color:var(--status-critical); font-weight:600;">${critical} Kritis</span> · 
+      <span style="color:var(--status-warning); font-weight:600;">${warn} Waspada</span> · 
+      <span style="color:var(--status-normal); font-weight:600;">${normal} Normal</span>
+      <span style="margin-left:8px; color:var(--text-muted);">— Update otomatis berdasarkan data anomali terbaru</span>
+    `;
   }
 }
 
