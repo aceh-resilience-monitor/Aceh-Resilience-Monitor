@@ -219,15 +219,19 @@ def _forecast_single_series(
             import mlflow
             import mlflow.prophet
             
-            # Start MLflow run under experiment 'arm-prophet-forecasting'
-            mlflow.set_experiment("arm-prophet-forecasting")
+            # Support nested child runs under parent run context (Aulia)
+            nested = False
+            if mlflow.active_run() is not None:
+                nested = True
+            else:
+                mlflow.set_experiment("arm-prophet-forecasting")
             
             # Formulate the run name to represent both commodity and region
             comm_slug = commodity.lower().replace(' ', '_')
             reg_slug = region_label.lower().replace(' ', '_')
             run_name = f"prophet-{comm_slug}-{reg_slug}"
             
-            with mlflow.start_run(run_name=run_name):
+            with mlflow.start_run(run_name=run_name, nested=nested):
                 mlflow.log_param("commodity", commodity)
                 mlflow.log_param("region", region_label)
                 mlflow.log_param("yearly_seasonality", True)

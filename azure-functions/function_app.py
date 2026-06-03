@@ -388,9 +388,7 @@ def log_daily_metrics_to_mlflow(anomalies: List[dict], spikes: List[dict]):
         import mlflow
         setup_mlflow_tracking()
 
-        mlflow.set_experiment("arm-daily-production")
-
-        with mlflow.start_run(run_name=f"daily-{datetime.now().strftime('%Y%m%d')}"):
+        def _log_metrics():
             mlflow.log_metric("total_anomalies", len(anomalies))
             mlflow.log_metric("critical_anomalies",
                               sum(1 for a in anomalies if a.get('severity') == 'critical'))
@@ -399,6 +397,14 @@ def log_daily_metrics_to_mlflow(anomalies: List[dict], spikes: List[dict]):
                               max((s['spike_pct'] for s in spikes), default=0))
             mlflow.log_param("date", datetime.now().strftime('%Y-%m-%d'))
             mlflow.log_param("pipeline", "azure-functions-daily")
+
+        # Log to parent run directly if active, otherwise create a new run (Aulia)
+        if mlflow.active_run():
+            _log_metrics()
+        else:
+            mlflow.set_experiment("arm-daily-production")
+            with mlflow.start_run(run_name=f"daily-{datetime.now().strftime('%Y%m%d')}"):
+                _log_metrics()
 
         logger.info("Daily metrics logged to MLflow successfully")
 
@@ -441,6 +447,12 @@ def arm_daily_pipeline(timer: func.TimerRequest) -> None:
     logger.info("═" * 60)
 
     try:
+        import mlflow
+        mlflow.set_experiment("arm-daily-production")
+        parent_run_name = f"daily-{datetime.now().strftime('%Y%m%d')}"
+        mlflow.start_run(run_name=parent_run_name)
+        logger.info("Started parent run '%s' in experiment 'arm-daily-production'", parent_run_name)
+
         # ── Step 0: Scrape hari ini (BARU) ──
         logger.info("Step 0/7: Scraping today's data from PIHPS...")
         raw_container = os.environ.get('ARM_BLOB_CONTAINER', 'arm-raw-data')
@@ -524,4 +536,18 @@ def arm_daily_pipeline(timer: func.TimerRequest) -> None:
     except Exception as e:
         elapsed = (datetime.now() - start_time).total_seconds()
         logger.error("❌ Pipeline failed after %.1f seconds: %s", elapsed, str(e))
+        try:
+            import mlflow
+            if mlflow.active_run():
+                mlflow.end_run(status="FAILED")
+        except Exception as mlflow_err:
+            logger.warning("Could not end failed MLflow run: %s", mlflow_err)
         raise
+    finally:
+        try:
+            import mlflow
+            if mlflow.active_run():
+                mlflow.end_run()
+                logger.info("Ended parent MLflow run successfully.")
+        except Exception as mlflow_err:
+            logger.warning("Could not end active MLflow run: %s", mlflow_err)
