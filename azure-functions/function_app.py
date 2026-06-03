@@ -115,12 +115,23 @@ def _download_blob_json(container: str, blob_name: str) -> list:
 def _upload_blob_json(container: str, blob_name: str, data, content_type='application/json'):
     """Upload JSON data to Blob Storage."""
     from azure.storage.blob import ContentSettings
+    import math
+
+    def sanitize_nans(obj):
+        if isinstance(obj, dict):
+            return {k: sanitize_nans(v) for k, v in obj.items()}
+        elif isinstance(obj, list):
+            return [sanitize_nans(v) for v in obj]
+        elif isinstance(obj, float) and math.isnan(obj):
+            return None
+        return obj
 
     blob_service = _get_blob_service()
     blob_client = blob_service.get_blob_client(container, blob_name)
 
     if isinstance(data, (dict, list)):
-        content = json.dumps(data, ensure_ascii=False, default=str)
+        sanitized_data = sanitize_nans(data)
+        content = json.dumps(sanitized_data, ensure_ascii=False, default=str)
     else:
         content = data
 
