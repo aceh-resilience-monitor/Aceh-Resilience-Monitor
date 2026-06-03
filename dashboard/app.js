@@ -150,7 +150,7 @@ function delay(ms) {
 async function loadData() {
   try {
     // 1. Try fetching from Azure Blob Storage (Data Lake)
-    const blobUrl = 'https://armdatalake2026.blob.core.windows.net/arm-data/dashboard_data.json';
+    const blobUrl = 'https://armmlworkspace7422048783.z23.web.core.windows.net/dashboard_data.json';
     const resp = await fetch(blobUrl);
     if (resp.ok) {
       DATA = await resp.json();
