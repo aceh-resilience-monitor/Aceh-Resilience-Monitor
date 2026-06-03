@@ -42,16 +42,35 @@ if root_dir not in sys.path:
 
 from scripts.config import (
     ALL_REGIONS,
+    ALL_SOURCES,
     CATEGORY_MAP,
+    CATEGORY_COLORS,
+    CATEGORY_ICONS,
+    CV_HIGH,
+    CHANGE_HIGH,
     FORECAST_DAYS,
     SHORT_NAMES,
     setup_logging,
 )
-from scripts.etl import add_holiday_features
+from scripts.etl import add_holiday_features, aggregate_prices
 from scripts.anomaly import detect_anomalies, detect_future_spikes
 from scripts.forecast import forecast_all_commodities
 from scripts.telegram_alert import send_daily_alert
 from scripts.scraper import scrape_daily_pihps
+from scripts.prepare_dashboard_data import (
+    build_timeseries,
+    build_timeseries_daily_recent,
+    build_commodity_cards,
+    build_yoy_data,
+    build_seasonality,
+    build_volatility,
+    build_correlation,
+    build_category_monthly,
+    build_regional_data,
+    build_price_by_source,
+    build_alert_feed,
+    generate_executive_summary,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -208,64 +227,153 @@ def compress_dashboard_data(
     spikes: List[dict],
 ) -> dict:
     """
-    Compress full pipeline output into a lightweight dashboard_data.json.
+    Compress full pipeline output into dashboard_data.json.
 
-    Reduction tactics:
-    1. Weekly resampling for historical trends (85% size reduction)
-    2. 90-day window for recent daily data
-    3. Limit anomalies to 200 most recent
-    4. Only forecast coordinates (yhat, yhat_lower, yhat_upper)
+    Now delegates to builder functions from prepare_dashboard_data.py
+    to ensure Azure pipeline output is IDENTICAL to local pipeline output.
 
-    Author: Ilhaam (Code & Frontend)
+    Author: Aulia (ML & Azure)
     """
     latest_date = df['date'].max()
     commodities = sorted(df['commodity'].unique().tolist())
 
-    # Aggregate to provincial level for dashboard
-    df_prov = df.groupby(['date', 'commodity'], as_index=False)['price'].mean()
-    df_prov['price'] = df_prov['price'].round(0)
+    # ── Filter for consumer-facing markets (same as local pipeline) ──
+    df_consumer = df[df['sumber'].isin(['Pasar Tradisional', 'Pasar Modern'])]
+    df_prov = aggregate_prices(df_consumer, by='province')
 
-    dashboard = {
-        'metadata': {
-            'generated': datetime.now().isoformat(),
-            'total_commodities': len(commodities),
-            'latest_date': latest_date.strftime('%Y-%m-%d'),
-            'data_source': 'Azure Functions Daily Pipeline',
-        },
-        'commodities': commodities,
-        'timeseries': {},
-        'timeseriesRecentDaily': {},
-        'forecasts': forecasts,
-        'anomalies': anomalies[:200],
-        'spikes': spikes,
+    # ── Enrich anomalies with shortName and category ──
+    for a in anomalies:
+        comm = a['commodity']
+        a['shortName'] = SHORT_NAMES.get(comm, comm)
+        a['category'] = CATEGORY_MAP.get(comm, 'Lainnya')
+
+    # ── 1. Timeseries ──
+    timeseries = build_timeseries(df_prov, commodities)
+    ts_daily_recent = build_timeseries_daily_recent(df_prov, commodities, latest_date)
+
+    # ── 2. Commodity cards ──
+    commodity_cards, latest_prices = build_commodity_cards(
+        df_prov, commodities, anomalies, latest_date
+    )
+
+    # ── 3. Analytical sections ──
+    yoy_data = build_yoy_data(df_prov, commodities)
+    seasonality = build_seasonality(df_prov, commodities)
+    volatility = build_volatility(df_prov, commodities)
+    correlation = build_correlation(df_prov, commodities)
+    category_monthly = build_category_monthly(df_prov)
+
+    # ── 4. Regional data (Tier 2 dashboard) ──
+    regional = build_regional_data(df_consumer, commodities)
+    price_by_source = build_price_by_source(df, commodities)
+
+    # ── 5. Regional forecasts ──
+    regional_forecasts = {}
+    for commodity in commodities:
+        if commodity in forecasts:
+            regional_forecasts[commodity] = {
+                k: v for k, v in forecasts[commodity].items()
+                if k != 'aggregated'
+            }
+
+    # ── 6. KPI summary ──
+    recent_start = (latest_date - pd.Timedelta(days=90)).strftime('%Y-%m-%d')
+    n_critical = len([c for c in commodity_cards if c['status'] == 'critical'])
+    n_warning = len([c for c in commodity_cards if c['status'] == 'warning'])
+
+    kpi = {
+        'totalCommodities': len(commodities),
+        'criticalAlerts': n_critical,
+        'warningAlerts': n_warning,
+        'avgPriceChange': round(
+            float(pd.Series([c['totalChange'] for c in commodity_cards]).mean()), 1
+        ),
+        'dataStartDate': df_prov['date'].min().strftime('%Y-%m-%d'),
+        'dataEndDate': latest_date.strftime('%Y-%m-%d'),
+        'totalDataPoints': len(df),
+        'recentAnomalies': len([a for a in anomalies if a['date'] >= recent_start]),
+        'totalRegions': len(ALL_REGIONS),
+        'totalSources': len(ALL_SOURCES),
     }
 
+    # ── 7. Alert feed + Executive summary ──
+    alert_feed = build_alert_feed(anomalies, spikes)
+    ai_insight = generate_executive_summary(anomalies, spikes, kpi)
+
+    # ── 8. Extract aggregated forecasts ──
+    forecasts_aggregated = {}
     for commodity in commodities:
-        cdf = df_prov[df_prov['commodity'] == commodity].sort_values('date')
+        if commodity in forecasts and 'aggregated' in forecasts[commodity]:
+            forecasts_aggregated[commodity] = forecasts[commodity]['aggregated']
 
-        # Weekly resampled historical data
-        if not cdf.empty:
-            weekly = cdf.set_index('date')['price'].resample('W').mean().dropna()
-            dashboard['timeseries'][commodity] = {
-                'dates': weekly.index.strftime('%Y-%m-%d').tolist(),
-                'prices': weekly.round(0).tolist(),
-            }
-
-            # Recent 90 days daily data
-            recent_start = latest_date - pd.Timedelta(days=90)
-            recent = cdf[cdf['date'] >= recent_start]
-            dashboard['timeseriesRecentDaily'][commodity] = {
-                'dates': recent['date'].dt.strftime('%Y-%m-%d').tolist(),
-                'prices': recent['price'].round(0).tolist(),
-            }
-
-    return dashboard
+    # ── 9. Assemble final JSON ──
+    return {
+        'kpi': kpi,
+        'commodityCards': commodity_cards,
+        'timeseries': timeseries,
+        'timeseriesRecentDaily': ts_daily_recent,
+        'anomalies': anomalies[:200],
+        'alertFeed': alert_feed,
+        'yoyData': yoy_data,
+        'seasonality': seasonality,
+        'volatility': volatility,
+        'correlation': correlation,
+        'categoryMonthly': category_monthly,
+        'forecasts': forecasts_aggregated,
+        'categories': list(sorted(set(CATEGORY_MAP.values()))),
+        'categoryIcons': CATEGORY_ICONS,
+        'categoryColors': CATEGORY_COLORS,
+        'aiInsight': ai_insight,
+        'regional': regional,
+        'priceBySource': price_by_source,
+        'regionalForecasts': regional_forecasts,
+        'regions': ALL_REGIONS,
+        'priceSources': ALL_SOURCES,
+    }
 
 
 # ══════════════════════════════════════════════════════════════════════
 # MLFLOW PRODUCTION TRACKING
 # Author: Aulia (ML & Azure) — G12 Production Metrics
 # ══════════════════════════════════════════════════════════════════════
+
+def setup_mlflow_tracking() -> bool:
+    """Setup MLflow tracking URI using config.json or Managed Identity."""
+    try:
+        import mlflow
+        config_path = os.path.join(root_dir, "config.json")
+        if os.path.exists(config_path):
+            from azureml.core import Workspace
+            ws = Workspace.from_config(path=config_path)
+            mlflow.set_tracking_uri(ws.get_mlflow_tracking_uri())
+            logger.info("Connected to Azure ML Workspace via config.json.")
+            return True
+        elif os.environ.get('ARM_SUBSCRIPTION_ID') and os.environ.get('ARM_RESOURCE_GROUP') and os.environ.get('ARM_WORKSPACE_NAME'):
+            from azureml.core import Workspace
+            from azureml.core.authentication import MsiAuthentication
+            try:
+                auth = MsiAuthentication()
+                ws = Workspace(
+                    subscription_id=os.environ['ARM_SUBSCRIPTION_ID'],
+                    resource_group=os.environ['ARM_RESOURCE_GROUP'],
+                    workspace_name=os.environ['ARM_WORKSPACE_NAME'],
+                    auth=auth
+                )
+                mlflow.set_tracking_uri(ws.get_mlflow_tracking_uri())
+                logger.info("Connected to Azure ML Workspace via Managed Identity.")
+                return True
+            except Exception as msi_err:
+                logger.warning("Failed to connect via Managed Identity: %s", msi_err)
+                mlflow.set_tracking_uri("sqlite:///mlflow.db")
+                return False
+        else:
+            mlflow.set_tracking_uri("sqlite:///mlflow.db")
+            logger.info("Connected to local SQLite database (mlflow.db).")
+            return False
+    except Exception as e:
+        logger.warning("Could not initialize MLflow tracking: %s", e)
+        return False
+
 
 def log_daily_metrics_to_mlflow(anomalies: List[dict], spikes: List[dict]):
     """
@@ -278,14 +386,7 @@ def log_daily_metrics_to_mlflow(anomalies: List[dict], spikes: List[dict]):
     """
     try:
         import mlflow
-
-        config_path = os.path.join(root_dir, "config.json")
-        if os.path.exists(config_path):
-            from azureml.core import Workspace
-            ws = Workspace.from_config(path=config_path)
-            mlflow.set_tracking_uri(ws.get_mlflow_tracking_uri())
-        else:
-            mlflow.set_tracking_uri("sqlite:///mlflow.db")
+        setup_mlflow_tracking()
 
         mlflow.set_experiment("arm-daily-production")
 
@@ -311,13 +412,13 @@ def log_daily_metrics_to_mlflow(anomalies: List[dict], spikes: List[dict]):
 # ══════════════════════════════════════════════════════════════════════
 
 @app.timer_trigger(
-    schedule="0 0 1 * * *",  # 01:00 UTC = 08:00 WIB
+    schedule="0 0 1,7 * * *",  # Run at 01:00 UTC (08:00 WIB) & 07:00 UTC (14:00 WIB)
     arg_name="timer",
     run_on_startup=False,
 )
 def arm_daily_pipeline(timer: func.TimerRequest) -> None:
     """
-    ARM Daily Pipeline — runs every morning at 08:00 WIB.
+    ARM Daily Pipeline — runs twice daily: 08:00 WIB and 14:00 WIB.
 
     Pipeline steps:
     0. Scrape today's data from PIHPS and update Blob Storage (Opsi A) (BARU)
@@ -332,6 +433,8 @@ def arm_daily_pipeline(timer: func.TimerRequest) -> None:
     Author: Aulia (ML & Azure) — G13 Azure Functions Pipeline
     """
     setup_logging()
+    # Initialize MLflow tracking globally at startup to log all 84 models (Aulia)
+    setup_mlflow_tracking()
     start_time = datetime.now()
     logger.info("═" * 60)
     logger.info("ARM Daily Pipeline started at %s", start_time.isoformat())

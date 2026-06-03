@@ -18,6 +18,7 @@ import logging
 import warnings
 from typing import Dict, List, Optional
 
+import numpy as np
 import pandas as pd
 
 from scripts.config import ALL_REGIONS, FORECAST_DAYS
@@ -125,6 +126,19 @@ def predict_future(
     return forecast_only
 
 
+def calculate_metrics(y_true, y_pred):
+    """Calculates MAE, RMSE, and MAPE metrics using numpy."""
+    mask = (y_true > 0) & (~np.isnan(y_true)) & (~np.isnan(y_pred))
+    if np.sum(mask) == 0:
+        return 0.0, 0.0, 0.0
+    y_t = y_true[mask]
+    y_p = y_pred[mask]
+    mae = np.mean(np.abs(y_t - y_p))
+    rmse = np.sqrt(np.mean((y_t - y_p) ** 2))
+    mape = np.mean(np.abs((y_t - y_p) / y_t)) * 100
+    return float(mae), float(rmse), float(mape)
+
+
 def _forecast_single_series(
     df_series: pd.DataFrame,
     commodity: str,
@@ -133,6 +147,7 @@ def _forecast_single_series(
 ) -> Optional[Dict]:
     """
     Train and forecast a single time series. Internal helper.
+    Performs backtesting evaluation and logs metrics to MLflow.
 
     Args:
         df_series: DataFrame for this series (must have date, price columns)
@@ -154,14 +169,104 @@ def _forecast_single_series(
     prophet_df = df_series[['date', 'price']].rename(
         columns={'date': 'ds', 'price': 'y'}
     ).copy()
-
-    # Inject holiday features into training data (Meugang, Ramadan, Nataru, wet season)
-    # Author: Aulia (ML & Azure) — G12 Feature Engineering
+    prophet_df['ds'] = pd.to_datetime(prophet_df['ds'])
+    prophet_df = prophet_df.sort_values('ds').reset_index(drop=True)
     prophet_df = add_holiday_features(prophet_df)
 
+    # 1. Backtesting split (Validation on last 90 days)
+    mae, rmse, mape = 0.0, 0.0, 0.0
+    split_date = prophet_df['ds'].max() - pd.Timedelta(days=90)
+    train_pdf = prophet_df[prophet_df['ds'] <= split_date].copy()
+    val_pdf = prophet_df[prophet_df['ds'] > split_date].copy()
+    
+    active_regressors = [r for r in HOLIDAY_REGRESSORS if r in prophet_df.columns]
+
+    if len(train_pdf) >= 30 and len(val_pdf) > 0:
+        try:
+            from prophet import Prophet
+            eval_model = Prophet(
+                yearly_seasonality=True,
+                weekly_seasonality=False,
+                daily_seasonality=False,
+                seasonality_mode='multiplicative',
+                changepoint_prior_scale=0.05
+            )
+            for reg in active_regressors:
+                eval_model.add_regressor(reg)
+            eval_model.fit(train_pdf)
+            
+            future = eval_model.make_future_dataframe(periods=len(val_pdf))
+            future = add_holiday_features(future)
+            forecast = eval_model.predict(future)
+            
+            merged = pd.merge(
+                val_pdf[['ds', 'y']], 
+                forecast[['ds', 'yhat']], 
+                on='ds', 
+                how='inner'
+            )
+            mae, rmse, mape = calculate_metrics(merged['y'].values, merged['yhat'].values)
+        except Exception as eval_err:
+            logger.warning("Validation split failed for %s [%s]: %s", commodity, region_label, eval_err)
+
+    # 2. Train final model on 100% data
     try:
         model = train_prophet(prophet_df)
         fc = predict_future(model, periods=periods)
+
+        # 3. Log runs to MLflow (integrated with Azure ML)
+        try:
+            import mlflow
+            import mlflow.prophet
+            
+            # Start MLflow run under experiment 'arm-prophet-forecasting'
+            mlflow.set_experiment("arm-prophet-forecasting")
+            
+            # Formulate the run name to represent both commodity and region
+            comm_slug = commodity.lower().replace(' ', '_')
+            reg_slug = region_label.lower().replace(' ', '_')
+            run_name = f"prophet-{comm_slug}-{reg_slug}"
+            
+            with mlflow.start_run(run_name=run_name):
+                mlflow.log_param("commodity", commodity)
+                mlflow.log_param("region", region_label)
+                mlflow.log_param("yearly_seasonality", True)
+                mlflow.log_param("weekly_seasonality", False)
+                mlflow.log_param("daily_seasonality", False)
+                mlflow.log_param("seasonality_mode", "multiplicative")
+                mlflow.log_param("changepoint_prior_scale", 0.05)
+                mlflow.log_param("total_historical_days", len(prophet_df))
+                mlflow.log_param("extra_regressors", ','.join(active_regressors) if active_regressors else 'none')
+                mlflow.log_param("has_meugang_regressor", 'is_meugang_season' in active_regressors)
+                
+                mlflow.log_metric("mae", mae)
+                mlflow.log_metric("rmse", rmse)
+                mlflow.log_metric("mape", mape)
+                
+                # Performance rating
+                if mape < 10.0:
+                    rating = "Sangat Baik"
+                elif mape < 20.0:
+                    rating = "Baik"
+                else:
+                    rating = "Perlu Tuning"
+                mlflow.log_param("performance_rating", rating)
+                
+                # To prevent timeout on serverless consumption plan, we ONLY log model artifacts
+                # for the 21 aggregated provincial models. We skip it for the 63 regional models.
+                # Avoid using mlflow.prophet.log_model due to Azure ML compatibility issues with /logged-models API (Aulia)
+                if region_label == 'aggregated':
+                    from prophet.serialize import model_to_json
+                    import tempfile
+                    import os
+                    with tempfile.TemporaryDirectory() as tmpdir:
+                        model_json_path = os.path.join(tmpdir, "model.json")
+                        with open(model_json_path, "w", encoding="utf-8") as f:
+                            f.write(model_to_json(model))
+                        mlflow.log_artifact(model_json_path, artifact_path="model")
+                    
+        except Exception as mlflow_err:
+            logger.warning("MLflow logging failed for %s [%s]: %s", commodity, region_label, mlflow_err)
 
         return {
             'dates': fc['ds'].dt.strftime('%Y-%m-%d').tolist(),
