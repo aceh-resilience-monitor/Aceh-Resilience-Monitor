@@ -137,17 +137,55 @@ Meskipun model baseline mencatatkan rata-rata MAPE yang sedikit lebih rendah di 
 
 ## Dokumentasi Azure
 
+Aceh Resilience Monitor (ARM) dibangun sepenuhnya di atas infrastruktur serverless Microsoft Azure. Seluruh arsitektur didesain untuk mencapai reprodusibilitas MLOps, ketersediaan tinggi, dan efisiensi biaya optimal.
+
+### 1. Azure Services yang Digunakan
+
 *   **Azure Blob Storage:**
-    *   *Fungsi:* Data Lake privat (`arm-raw-data` container) untuk menyimpan file JSON data harga pangan mentah tahunan (`2021.json` s/d `2026.json`).
-    *   *Web Host Container:* Menyimpan file terkompresi `dashboard_data.json` di container publik `$web` dengan konfigurasi CORS terpusat agar dapat diakses secara langsung oleh dashboard tanpa hambatan keamanan.
+    *   *Fungsi:* Data Lake privat (`arm-raw-data` container) untuk menyimpan file JSON data harga pangan mentah tahunan (`2021.json` s/d `2026.json`) secara terstruktur.
+    *   *Web Host Container:* Menyimpan file terkompresi `dashboard_data.json` di container publik `$web` dengan konfigurasi CORS terpusat agar dapat diakses secara langsung oleh dashboard frontend.
 *   **Azure Functions (Serverless Orchestrator):**
     *   *Fungsi:* Backend yang berjalan secara serverless dengan runtime Python 3.11. Pipa orkestrator dipicu otomatis dua kali sehari pada pukul **08:00 WIB** dan **14:00 WIB** menggunakan Timer Trigger cron (`"0 0 1,7 * * *"`).
     *   *Tugas:* Menjalankan scraper web, memproses in-memory ETL (menambahkan 4 regressor kearifan lokal), menghitung Z-score anomali, melakukan in-memory training 84 model Prophet, mengirim notifikasi Telegram, dan memperbarui JSON di Storage dalam batas runtime 10 menit.
 *   **Azure Machine Learning Studio (MLflow Tracking):**
-    *   *Fungsi:* Infrastruktur pelacakan eksperimen MLOps untuk memantau performa model. Setiap eksekusi harian mencatat metrik MAE, RMSE, dan MAPE ke workspace AML Studio.
+    *   *Fungsi:* Platform MLOps terintegrasi untuk memantau performa model. Setiap eksekusi harian mencatat metrik MAE, RMSE, dan MAPE ke workspace AML Studio.
     *   *Optimalisasi:* Menggunakan skema *nested runs* (84 child runs di bawah 1 parent run harian). File `model.json` hanya diunggah untuk 21 model agregasi provinsi guna menghemat penyimpanan dan memotong waktu eksekusi serverless.
 *   **Azure Static Web Apps:**
     *   *Fungsi:* Platform hosting frontend web (HTML/CSS/JS) serverless yang terintegrasi secara otomatis dengan repositori GitHub (CI/CD). Menyediakan SSL gratis secara otomatis dan pemuatan aset dasbor global CDN dengan latency sangat rendah (<1.5 detik).
+
+### 2. Justifikasi Pemilihan Azure vs AWS/GCP
+
+| Kriteria | Microsoft Azure | AWS | GCP |
+| :--- | :--- | :--- | :--- |
+| **MLflow Integration** | Native di Azure ML Studio (tanpa setup server tambahan) ✅ | SageMaker (membutuhkan konfigurasi terpisah) | Vertex AI (membutuhkan konfigurasi terpisah) |
+| **Static Web Hosting** | Static Web Apps (zero-config, terintegrasi GitHub) ✅ | S3 + CloudFront (memerlukan konfigurasi manual) | Firebase Hosting |
+| **Serverless Functions** | Functions V2 (Python Native Programming Model) ✅ | Lambda | Cloud Functions |
+| **Biaya Free Tier** | Sangat ramah untuk riset & kompetisi (unlimited SWA) ✅ | Terbatas waktu (12 bulan free trial) | Terbatas saldo |
+
+### 3. Estimasi Biaya (Zero-Cost Infrastructure)
+
+Dengan memanfaatkan tier gratis (Free Tier) dari Microsoft Azure, ARM berhasil membuktikan bahwa sistem intelijen harga pangan tingkat provinsi dapat dioperasikan secara **gratis ($0/bulan)**:
+
+| Service | Tier | Estimasi Konsumsi Bulanan | Harga/Bulan | Catatan |
+| :--- | :--- | :--- | :---: | :--- |
+| **Azure Blob Storage** | Hot LRS (5 GB) | Data mentah + dashboard feed (~100 MB) | **$0** | Masih jauh di bawah kuota gratis |
+| **Azure Functions** | Consumption Plan | 2 kali eksekusi/hari × 40 detik execution | **$0** | Kuota gratis: 1 juta eksekusi/bulan |
+| **Azure Static Web Apps** | Free Tier | Unlimited bandwidth dasbor | **$0** | Hosting kode frontend gratis |
+| **Azure ML + MLflow** | Free Tier | Workspace MLflow tracking gratis | **$0** | Training ML berjalan di RAM serverless |
+| **TOTAL** | | | **$0/bulan** | Cocok untuk diadopsi Pemda tanpa APBD tambahan |
+
+### 4. Skalabilitas & Rencana Ekspansi (34 Provinsi)
+
+Arsitektur ARM dirancang modular. Jika wilayah pemantauan diperluas ke tingkat nasional (34 Provinsi), sistem dapat dengan mudah melakukan ekspansi secara linier:
+
+| Skala Pemantauan | Jumlah Model | Estimasi Waktu Komputasi | Rekomendasi Plan & Biaya |
+| :--- | :---: | :---: | :--- |
+| **3 Daerah (Saat Ini)** | 84 | ~40 detik | Consumption Plan ($0/bulan) |
+| **10 Kabupaten/Kota** | 210 | ~2 menit | Consumption Plan ($0/bulan) |
+| **34 Provinsi (Nasional)** | 714 | ~5-8 menit | Premium Plan ($0 - $20/bulan) |
+| **Nasional Granular** | 5000+ | ~30 menit | Dedicated/App Service Plan ($50+/bulan) |
+
+> **Logika Pemrosesan Paralel (MLOps Optimization)**: Untuk mempercepat eksekusi pelatihan model deret waktu dalam skala besar di Azure Functions, sistem mengadopsi pelatihan paralel menggunakan pustaka `multiprocessing` di Python, serta menyeleksi unggahan berkas `model.json` ke MLflow (hanya mengunggah file model hasil agregasi utama provinsi untuk meminimalkan latensi overhead I/O storage).
 
 ---
 
