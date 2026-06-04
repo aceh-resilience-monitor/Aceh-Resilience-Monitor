@@ -137,23 +137,110 @@ Meskipun model baseline mencatatkan rata-rata MAPE yang sedikit lebih rendah di 
 
 ## Dokumentasi Azure
 
-Aceh Resilience Monitor (ARM) dibangun sepenuhnya di atas infrastruktur serverless Microsoft Azure. Seluruh arsitektur didesain untuk mencapai reprodusibilitas MLOps, ketersediaan tinggi, dan efisiensi biaya optimal.
+Aceh Resilience Monitor (ARM) dibangun sepenuhnya di atas infrastruktur cloud-native serverless Microsoft Azure. Desain arsitektur ini menerapkan prinsip Zero-Maintenance, MLOps Tracking, Enterprise Security, dan Zero-Cost Infrastructure (Free Tier).
 
-### 1. Azure Services yang Digunakan
+### 1. Azure Services yang Digunakan & Konfigurasi Teknis
 
-*   **Azure Blob Storage:**
-    *   *Fungsi:* Data Lake privat (`arm-raw-data` container) untuk menyimpan file JSON data harga pangan mentah tahunan (`2021.json` s/d `2026.json`) secara terstruktur.
-    *   *Web Host Container:* Menyimpan file terkompresi `dashboard_data.json` di container publik `$web` dengan konfigurasi CORS terpusat agar dapat diakses secara langsung oleh dashboard frontend.
-*   **Azure Functions (Serverless Orchestrator):**
-    *   *Fungsi:* Backend yang berjalan secara serverless dengan runtime Python 3.11. Pipa orkestrator dipicu otomatis dua kali sehari pada pukul **08:00 WIB** dan **14:00 WIB** menggunakan Timer Trigger cron (`"0 0 1,7 * * *"`).
-    *   *Tugas:* Menjalankan scraper web, memproses in-memory ETL (menambahkan 4 regressor kearifan lokal), menghitung Z-score anomali, melakukan in-memory training 84 model Prophet, mengirim notifikasi Telegram, dan memperbarui JSON di Storage dalam batas runtime 10 menit.
-*   **Azure Machine Learning Studio (MLflow Tracking):**
-    *   *Fungsi:* Platform MLOps terintegrasi untuk memantau performa model. Setiap eksekusi harian mencatat metrik MAE, RMSE, dan MAPE ke workspace AML Studio.
-    *   *Optimalisasi:* Menggunakan skema *nested runs* (84 child runs di bawah 1 parent run harian). File `model.json` hanya diunggah untuk 21 model agregasi provinsi guna menghemat penyimpanan dan memotong waktu eksekusi serverless.
-*   **Azure Static Web Apps:**
-    *   *Fungsi:* Platform hosting frontend web (HTML/CSS/JS) serverless yang terintegrasi secara otomatis dengan repositori GitHub (CI/CD). Menyediakan SSL gratis secara otomatis dan pemuatan aset dasbor global CDN dengan latency sangat rendah (<1.5 detik).
+*   **Azure Blob Storage (Data Lake & Static Content Hosting):**
+    *   *Data Lake Privat (`arm-raw-data`)*: Menyimpan data historis tahunan harga pangan (`2021.json` s/d `2026.json`) dalam level granular 2 (sub-komoditas). Folder diatur secara privat untuk mencegah kebocoran data hulu.
+    *   *Web Feed Container (`$web`)*: Menyimpan file hasil agregasi terkompresi `dashboard_data.json` (~1.2 MB) untuk dikonsumsi langsung oleh client-side dashboard secara asinkron.
+*   **Azure Functions (Serverless Orchestrator V2):**
+    *   *Runtime & Environment*: Menggunakan Python 3.11. Mengadopsi Azure Functions V2 Programming Model untuk penyusunan kode dekorator yang modular.
+    *   *Triggering*: Berjalan otomatis dua kali sehari (pukul 08:00 WIB dan 14:00 WIB) menggunakan Timer Trigger dengan ekspresi cron UTC `"0 0 1,7 * * *"`.
+    *   *Timeout Optimization*: Batas durasi eksekusi ditingkatkan menjadi **10 menit** (`"functionTimeout": "00:10:00"` pada host.json) untuk memberikan ruang komputasi yang aman saat melatih 84 model Prophet secara in-memory (RAM).
+*   **Azure Machine Learning Studio (MLflow API Tracking):**
+    *   *MLOps Engine*: Mengintegrasikan MLflow API secara native untuk melacak performa model. Setiap pemicuan harian mencatat metrik MAE, RMSE, dan MAPE secara real-time.
+    *   *Struktur Nested Runs*: Menerapkan 1 Parent Run harian (menandakan batch eksekusi) dengan 84 Child Runs (merepresentasikan model per komoditas dan daerah).
+    *   *Compute-Storage Optimization*: Berkas `model.json` hanya diunggah untuk 21 model agregasi utama provinsi untuk menghemat penyimpanan cloud.
+*   **Azure Static Web Apps (SWA):**
+    *   *Hosting Frontend*: Menyajikan dasbor bertema *Dark Glassmorphism* (HTML/CSS/JS) dengan integrasi build otomatis GitHub Actions. Menyediakan sertifikat SSL gratis secara otomatis dan disebarkan melalui Microsoft Global CDN dengan latency pemuatan dasbor < 1.5 detik.
 
-### 2. Justifikasi Pemilihan Azure vs AWS/GCP
+### 2. Keamanan & Autentikasi: Entra ID Managed Identity (MSI) & RBAC
+
+Untuk menghindari kebocoran kredensial (seperti password atau API Key Azure ML) pada repositori kode publik, ARM menggunakan **System-Assigned Managed Identity** (Entra ID / Active Directory):
+*   **Koneksi Tanpa Kunci (Passwordless)**: Azure Function App dikonfigurasi agar memiliki identitas unik yang terdaftar pada sistem Azure Active Directory.
+*   **Role-Based Access Control (RBAC)**: Juri dan administrator dapat menjalankan script `make fix-msi` yang secara otomatis memberikan peran **Contributor** kepada identitas Azure Functions pada scope Resource Group proyek:
+    ```bash
+    az role assignment create --assignee "<principal-id>" --role "Contributor" --scope "/subscriptions/<sub-id>/resourceGroups/<rg-name>"
+    ```
+*   **Keamanan MLflow**: Pustaka MLflow pada Azure Functions mengenali token Managed Identity secara otomatis di cloud untuk melakukan *handshake* autentikasi dengan Workspace Azure ML Studio tanpa menuliskan berkas `config.json` rahasia di dalam paket deployment.
+
+### 3. Integrasi Jaringan & Kebijakan CORS
+
+*   **Masalah Cross-Origin**: Dasbor web yang dihosting di Azure Static Web Apps perlu mengambil berkas data `dashboard_data.json` dari Azure Blob Storage. Tanpa konfigurasi CORS, kebijakan keamanan browser akan memblokir request tersebut.
+*   **Solusi Konfigurasi CORS**: Melalui Azure CLI, aturan CORS pada Storage Account dikonfigurasi secara ketat untuk hanya menerima metode `GET` dari domain resmi dasbor Static Web Apps dan domain pengujian lokal:
+    ```bash
+    az storage cors add --methods GET --origins "https://thankful-river-084494910.7.azurestaticapps.net" "http://localhost:8000" --services b --connection-string "$(CONNECTION_STRING)"
+    ```
+*   **Konfigurasi Dasbor SWA**: Menggunakan staticwebapp.config.json untuk mengatur header keamanan browser seperti `Content-Security-Policy` dan `X-Frame-Options` guna memperkokoh keamanan frontend.
+
+### 4. Integrasi CI/CD & GitHub Actions
+
+ARM mengintegrasikan repositori GitHub secara native dengan Azure Static Web Apps untuk menerapkan jalur otomatisasi **Continuous Integration & Continuous Deployment (CI/CD)**:
+*   **Pemicu Otomatis (Triggers)**: Setiap kali anggota tim melakukan `push` atau menggabungkan *Pull Request* ke cabang utama `master`, GitHub Actions akan memicu berkas workflow `.github/workflows/azure-static-web-apps-thankful-river-084494910.yml`.
+*   **Proses Build & Deploy**: Pekerjaan (Job) GitHub runner berbasis Ubuntu akan memeriksa kode sumber (*checkout*), memvalidasi struktur, mengompilasi aset dasbor frontend, dan mendorongnya ke server CDN Azure menggunakan token rahasia `AZURE_STATIC_WEB_APPS_API_TOKEN_THANKFUL_RIVER_084494910` yang tersimpan aman di GitHub Repository Secrets.
+*   **Zero-Downtime Deployment**: Azure Static Web Apps memastikan transisi antar-versi dasbor berjalan tanpa interupsi bagi pengguna akhir (TPID/Satgas Pangan).
+
+### 5. Otomasi CLI & Operasional Cloud (Makefile)
+
+Seluruh operasi manajemen sumber daya Azure dibungkus ke dalam shortcut perintah otomatis pada Makefile untuk memastikan efisiensi pengelolaan bagi tim pengembang:
+*   `make deploy-functions` : Mengompilasi dependensi local `requirements.txt` dan mengunggah kode serverless ke Azure Function App.
+*   `make upload-dashboard` : Melakukan unggahan batch berkas frontend dasbor (`dashboard/`) langsung ke penampung `$web` Blob Storage.
+*   `make trigger-cloud`    : Menarik Master Key admin dari Azure Portal secara asinkron lalu mengirimkan request POST HTTP untuk memaksa pemicuan pipeline di cloud.
+*   `make monitor-logs`     : Menjalankan kueri Kusto (KQL) ke Application Insights untuk menampilkan 30 jejak log eksekusi pipeline cloud terbaru langsung pada terminal lokal.
+*   `make fix-cors`         : Mengatur ulang kebijakan akses CORS pada Storage Account dan Function App.
+*   `make fix-msi`          : Mengotomatiskan pemberian hak Managed Identity pada tingkat Resource Group.
+
+### 6. Protokol Sinkronisasi Data (Opsi A - Hybrid Streaming)
+
+Untuk menjaga sinkronisasi data yang konsisten antara lokal, scraper, dan cloud data lake, ARM menggunakan model sinkronisasi hibrida:
+```
+[Azure Functions Timer Trigger]
+      │
+      ├── 1. Panggil scraper.py harian ➔ Tarik data terbaru dari web PIHPS Bank Indonesia
+      │
+      ├── 2. Ambil berkas JSON tahun berjalan (2026.json) dari privat Blob Storage
+      │
+      ├── 3. Lakukan append baris harga baru ➔ Unggah kembali berkas 2026.json ke Data Lake Privat
+      │
+      ├── 4. Muat seluruh berkas historis (2021.json s/d 2026.json) ke memori RAM Functions
+      │
+      ├── 5. Lakukan deteksi anomali statistik Z-Score harian
+      │
+      ├── 6. Jalankan pemodelan latih ulang Prophet (84 model) secara paralel di RAM
+      │
+      ├── 7. Kompresi seluruh data analisis dan simpan sebagai dashboard_data.json (~1.2 MB)
+      │
+      ├── 8. Unggah dashboard_data.json ke container publik $web Blob Storage
+      │
+      └── 9. Kirim ringkasan peringatan taktis ke Telegram & metrik evaluasi ke Azure ML Studio
+```
+
+### 7. Bukti Dokumentasi Visual Azure (Screenshots)
+
+Untuk memberikan validasi nyata kepada juri bahwa infrastruktur cloud ARM telah berjalan 100% aktif dan terintegrasi di server Microsoft Azure, berikut adalah bukti tangkapan layar sistem yang harus disematkan:
+
+#### A. Pelacakan Eksperimen Azure ML Studio (MLflow)
+Menampilkan daftar Parent Run harian dengan nested Child Runs untuk 84 model Prophet, lengkap dengan pencatatan parameter komoditas dan metrik evaluasi (MAPE/MAE/RMSE):
+![Azure ML Studio - MLflow Run History](docs/images/azure_mlflow_runs.png)
+*Tangkapan layar workspace Azure ML Studio yang menunjukkan visualisasi performa run model.*
+
+#### B. Eksekusi Serverless Azure Functions
+Menampilkan log eksekusi berkala dari timer trigger `arm_daily_pipeline` yang berhasil melakukan scraping data PIHPS, kalkulasi modeling di RAM, dan pengiriman alert Telegram:
+![Azure Functions - Daily Pipeline Execution Logs](docs/images/azure_functions_logs.png)
+*Tangkapan layar log eksekusi Azure Functions pada Application Insights.*
+
+#### C. Penampung Data Lake Azure Blob Storage
+Menampilkan file JSON data mentah tahunan privat (`arm-raw-data`) dan file serving dasbor publik (`$web/dashboard_data.json`):
+![Azure Storage Explorer - Blob Data Lake](docs/images/azure_storage_containers.png)
+*Tangkapan layar struktur container Blob Storage pada Azure Portal.*
+
+#### D. Jalur Integrasi CI/CD GitHub Actions
+Menampilkan rekam jejak otomatisasi deploy frontend dasbor yang terhubung secara realtime dengan repositori GitHub:
+![GitHub Actions - CI/CD Workflow for SWA](docs/images/github_actions_workflow.png)
+*Tangkapan layar visualisasi workflow GitHub Actions yang sukses deploy ke Azure Static Web Apps.*
+
+### 8. Justifikasi Pemilihan Azure vs AWS/GCP
 
 | Kriteria | Microsoft Azure | AWS | GCP |
 | :--- | :--- | :--- | :--- |
@@ -162,7 +249,7 @@ Aceh Resilience Monitor (ARM) dibangun sepenuhnya di atas infrastruktur serverle
 | **Serverless Functions** | Functions V2 (Python Native Programming Model) ✅ | Lambda | Cloud Functions |
 | **Biaya Free Tier** | Sangat ramah untuk riset & kompetisi (unlimited SWA) ✅ | Terbatas waktu (12 bulan free trial) | Terbatas saldo |
 
-### 3. Estimasi Biaya (Zero-Cost Infrastructure)
+### 9. Estimasi Biaya (Zero-Cost Infrastructure)
 
 Dengan memanfaatkan tier gratis (Free Tier) dari Microsoft Azure, ARM berhasil membuktikan bahwa sistem intelijen harga pangan tingkat provinsi dapat dioperasikan secara **gratis ($0/bulan)**:
 
@@ -174,7 +261,7 @@ Dengan memanfaatkan tier gratis (Free Tier) dari Microsoft Azure, ARM berhasil m
 | **Azure ML + MLflow** | Free Tier | Workspace MLflow tracking gratis | **$0** | Training ML berjalan di RAM serverless |
 | **TOTAL** | | | **$0/bulan** | Cocok untuk diadopsi Pemda tanpa APBD tambahan |
 
-### 4. Skalabilitas & Rencana Ekspansi (34 Provinsi)
+### 10. Skalabilitas & Rencana Ekspansi (34 Provinsi)
 
 Arsitektur ARM dirancang modular. Jika wilayah pemantauan diperluas ke tingkat nasional (34 Provinsi), sistem dapat dengan mudah melakukan ekspansi secara linier:
 
