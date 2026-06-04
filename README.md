@@ -20,8 +20,8 @@
 
 | No | Nama | Email Dicoding | Peran Utama & Atribusi Kode |
 | :---: | :--- | :--- | :--- |
-| 1 | **Aulia Muzhaffar** | auliamuzhaffar@gmail.com | *Machine Learning & Azure Specialist* (Logika *Forecasting* Prophet, Evaluasi Holdout, Azure ML & MLflow, Azure Functions Serverless Pipeline, Bug Fixing `NaN` ke `null`). |
-| 2 | **Muhammad Ilhaam Ghiffari** | ilhaamghiffari@gmail.com | *Data Engineer & Frontend Developer* (Modular Refactoring ETL, Z-Score Anomaly Detection, Dasbor Dark Glassmorphism, Kompresi Payload JSON, CORS Configuration). |
+| 1 | **Aulia Muzhaffar** | auliamuzhaffar@gmail.com | *Machine Learning & Azure Specialist* (Logika *Forecasting* Prophet, Evaluasi Holdout, Azure ML & MLflow, Azure Functions Serverless Pipeline, Bug Fixing `NaN` ke `null`, Implemen Uji Hipotesis, dan Storytelling Notebook). |
+| 2 | **Muhammad Ilhaam Ghiffari** | ilhaamghiffari@gmail.com | *Data Engineer & Frontend Developer* (Modular Refactoring ETL, Z-Score Anomaly Detection, Dasbor Dark Glassmorphism, Kompresi Payload JSON, CORS Configuration, Security Environment Localizer). |
 | 3 | **Arief Hidayah** | ariefhidayahm@gmail.com | *QA Auditor, Repo Manager & Storyteller* (Scraping Data PIHPS, Unit Testing Pytest, Laporan Arsitektur Cloud & Error Analysis, Q&A Drill, Alert Telegram Bot). |
 
 *   **Topik Proyek:** Ketahanan Pangan & Agrikultur Modern
@@ -35,13 +35,13 @@
 Volatilitas harga pangan strategis (*volatile foods*) merupakan salah satu penyumbang inflasi daerah terbesar di Indonesia. Di Provinsi Aceh, tantangan ini diperparah oleh:
 1.  **Lambatnya Integrasi Data:** Proses pengumpulan data harga di pasar-pasar tradisional masih bersifat manual atau terpisah antara portal seperti PIHPS dan SP2KP, memicu jeda analisis hingga beberapa hari.
 2.  **Respons yang Bersifat Reaktif:** Instansi pemerintah (TPID/Satgas Pangan) umumnya baru melakukan intervensi (seperti Operasi Pasar Murah) setelah harga pangan melambung tinggi di pasar konsumen (*hilir*).
-3.  **Ketiadaan Prediksi Tren:** Pemangku kebijakan tidak memiliki instrumen cerdas untuk memproyeksikan pergerakan harga komoditas pangan esensial ke depan berdasarkan siklus hari raya lokal.
+3.  **Kebutaan Kalender (Calendar Blindness):** Pemangku kebijakan tidak memiliki instrumen cerdas untuk memproyeksikan pergerakan harga komoditas pangan esensial ke depan berdasarkan siklus hari raya lokal keagamaan Islam (seperti Meugang dan Ramadan) yang tanggalnya selalu bergeser sekitar 11 hari setiap tahun Gregorian mengikuti kalender lunar Hijriah.
 
 ### Problem Statement
 Bagaimana membangun sistem otomatisasi terintegrasi yang mampu mengumpulkan data harga pangan harian secara serverless, mendeteksi anomali harga harian, dan meramal lonjakan harga 90 hari ke depan guna menyajikan rekomendasi kebijakan stabilisasi pasar secara preventif?
 
 ### Research Questions
-1.  Komoditas apa saja yang saat ini menunjukkan anomali harga kritis di luar batas deviasi wajar ($2\sigma$) terhadap rata-rata bulanan (MA30)?
+1.  Komoditas apa saja yang saat ini menunjukkan anomali harga kritis di luar batas deviasi wajar ($2\sigma$ atau $3\sigma$) terhadap rata-rata bulanan (MA30)?
 2.  Komoditas apa saja yang diprediksi oleh Machine Learning akan mengalami lonjakan harga ekstrem ($\ge 20\%$) dalam 90 hari ke depan?
 
 ### Mengapa Memilih Proyek Ini (Painkiller Concept)
@@ -107,6 +107,7 @@ flowchart TB
 *   **Interactive Forecast Charts & YoY Analysis:** Visualisasi data interaktif per komoditas yang dilengkapi sakelar (*toggle*) untuk memunculkan garis tren masa lalu dan garis batas atas/bawah prediksi harga di masa depan.
 *   **Data Compression Engine:** Pengompresi ukuran data dasbor harian hingga 85% (~509 KB) melalui *weekly resampling* untuk menjamin kecepatan muat dasbor di bawah 1.5 detik.
 *   **Automated Telegram Alerts**: Notifikasi instan harian pada pukul 08:00 WIB ke grup Telegram Satgas Pangan jika terdeteksi anomali kritis atau proyeksi harga ekstrem.
+*   **Fallback Protocol (Safety Net) Komoditas Volatil:** Untuk sayur hortikultura (Cabai, Bawang Merah) yang memiliki MAPE >15%, sistem otomatis mengabaikan prediksi titik (*point forecast*) dan beralih ke batas atas (*yhat_upper*) yang dikombinasikan dengan alarm Z-Score harian.
 
 ---
 
@@ -114,8 +115,8 @@ flowchart TB
 
 *   **Bahasa Utama:** Python 3.11 (backend & cloud pipeline), JavaScript (Chart.js & Leaflet.js frontend).
 *   **Azure Blob Storage:** Bertindak sebagai *Data Lake* harian untuk menyimpan data harga mentah tahunan (`2021.json` s/d `2026.json`) secara terstruktur di container privat `arm-raw-data`. Layanan ini juga digunakan sebagai hosting data serving dasbor publik (`dashboard_data.json`) pada container `$web` yang telah dikonfigurasi dengan aturan CORS terpusat.
-*   **Azure Functions:** Bertindak sebagai *serverless orchestrator* harian. Berjalan otomatis pada pukul 08:00 WIB (Timer Trigger) menggunakan runtime Python 3.11 dengan konfigurasi timeout 10 menit. Tugasnya adalah mengeksekusi scraper, prapemrosesan data, kalkulasi Z-Score, training model Prophet secara in-memory, pengiriman alert Telegram, dan pembaharuan berkas JSON.
-*   **Azure Machine Learning Studio (MLflow):** Platform MLOps terintegrasi untuk memantau performa model. Melacak dan mencatat metrik evaluasi (MAPE, MAE, RMSE) dari 84 model Prophet harian untuk mendeteksi *data/concept drift* serta mempermudah reproduksibilitas model.
+*   **Azure Functions:** Bertindak sebagai *serverless orchestrator* harian. Berjalan otomatis dua kali sehari pada pukul **08:00 WIB** dan **14:00 WIB** (cron `"0 0 1,7 * * *"`) menggunakan runtime Python 3.11 dengan konfigurasi timeout 10 menit. Tugasnya adalah mengeksekusi scraper, prapemrosesan data, kalkulasi Z-Score, training model Prophet secara in-memory, pengiriman alert Telegram, dan pembaharuan berkas JSON.
+*   **Azure Machine Learning Studio (MLflow):** Platform MLOps terintegrasi untuk memantau performa model. Melacak dan mencatat metrik evaluasi (MAPE, MAE, RMSE) dari 84 model Prophet harian untuk mendeteksi *data/concept drift* serta mempermudah reproduksibilitas model. Menggunakan struktur *nested runs* (84 child runs di bawah 1 parent run harian) dengan optimalisasi efisiensi penyimpanan (*model.json* hanya diunggah untuk 21 model utama agregasi provinsi).
 *   **Azure Static Web Apps:** Platform hosting dasbor frontend (HTML/CSS/JS) serverless yang terintegrasi secara otomatis dengan repositori GitHub. Menyediakan SSL otomatis dan CDN global untuk pemuatan dasbor yang cepat dan aman.
 
 ---
@@ -124,11 +125,12 @@ flowchart TB
 
 Pemodelan time-series menggunakan algoritma **Meta Prophet** dengan penambahan parameter *Extra Regressors* untuk menangani hari raya keagamaan dan musim lokal di Aceh:
 *   **Fitur Kearifan Lokal (Local Wisdom Regressors):**
-    *   `is_meugang_season`: Mengidentifikasi tradisi H-2 s/d H-0 menyembelih sapi menjelang Ramadan & Lebaran (mengantisipasi *demand shock* daging sapi & bumbu).
-    *   `is_ramadan_prep`: Persiapan pangan H-7 s/d H-1 awal puasa.
+    *   `is_meugang_season`: Mengidentifikasi tradisi menyembelih sapi menjelang Ramadan & Lebaran. Ditandai selama 3 hari jendela dampak (**H-2 s/d H-0** dari tanggal penetapan Kemenag RI) untuk mengantisipasi *demand shock* daging sapi & bumbu.
+    *   `is_ramadan_prep`: Persiapan pangan menjelang awal puasa selama 7 hari (**H-7 s/d H-1** sebelum 1 Ramadan).
     *   `is_nataru`: Liburan Natal & Tahun Baru (20 Des – 2 Jan).
-    *   `is_wet_season`: Musim hujan Aceh (Oktober – April) dari data BMKG untuk mengantisipasi *supply shock* cabai dan bawang.
+    *   `is_wet_season`: Musim hujan Sumatera (Oktober – April) dari data BMKG untuk mengantisipasi *supply shock* cabai dan bawang akibat gagal panen dan gangguan penyeberangan logistik laut.
 *   **Metode Validasi:** *Time-based Holdout Split (90 Hari)* untuk memastikan model diuji pada data yang belum pernah dilihat.
+*   **Metode Penanganan Korelasi Semu (Spurious Correlation):** Untuk menghindari korelasi semu akibat inflasi jangka panjang pada rentang waktu 2021–2026, analisis korelasi dihitung berbasis *Daily Returns* (persentase perubahan harian), bukan harga nominal mentah.
 *   **Hasil Evaluasi Akurasi (MAPE) Agregat (21 Komoditas):** **7.74%** (Mengurangi error baseline hingga 22%).
 
 ---
@@ -167,18 +169,23 @@ Untuk memvalidasi keunggulan algoritma **Meta Prophet**, kami melakukan pengujia
 | **Telur Ayam Ras Segar** | 8.54% | 7.39% | 7.55% | **7.07%** | **Prophet Unggul!** Mengurangi error dibanding semua baseline |
 | **Rata-rata (21 Komoditas)** | **10.00%** | **9.45%** | **9.30%** | **12.38%** | **Prophet stabil di rata-rata ~12%** |
 
-> [!NOTE]
-> **Justifikasi Pertahanan Baseline (ML Defense)**: Rendahnya error model baseline pada beberapa komoditas (seperti Gula Premium 0.00% pada Naive) disebabkan oleh harga pangan yang cenderung flat/datar akibat kebijakan Batas Eceran Tertinggi (HET) pemerintah di akhir tahun 2025. Namun, model baseline bersifat **buta kalender** (tidak dapat memprediksi lonjakan menjelang Meugang/Ramadhan). Prophet adalah satu-satunya model yang secara proaktif memproyeksikan *demand/supply shocks* ini secara akurat.
+### 🛡️ Defensibilitas Model & Bahaya Time-Lag Moving Average
+Meskipun model baseline mencatatkan rata-rata MAPE yang sedikit lebih rendah di masa tenang (karena harga pangan di akhir tahun 2025 cenderung kaku akibat Harga Eceran Tertinggi/HET pemerintah), model-model tersebut menderita **efek lagging (time-lag)** yang parah ketika terjadi lonjakan harga mendadak (*demand shock* seperti Meugang). 
+
+Rata-rata bergerak (SMA/EMA) hanya memproyeksikan garis lurus konstan ke depan dan baru beraksi *setelah* harga naik selama berminggu-minggu di pasar konsumen. Model Prophet, dengan bantuan *Deterministic Extra Regressors*, memproyeksikan kenaikan harga secara proaktif **sebelum lonjakan terjadi** (mampu mendeteksi *turning point*). Kemampuan antisipatif inilah yang membuat Prophet jauh lebih layak secara operasional sebagai Sistem Peringatan Dini (EWS) bagi TPID.
 
 ---
 
 ## 🛡️ 9. Kualitas Kode & Penjaminan Mutu (Quality Assurance)
 
 Untuk memastikan keandalan pipeline data dan kesiapan tingkat produksi (production-ready), kami menerapkan pengujian unit otomatis yang ketat. Repositori ini memiliki **74 unit tests otomatis** yang mencakup:
-*   **ETL Pipeline Tests**: Memverifikasi kebenaran pembersihan data, penanganan string kosong, deteksi format tanggal tidak standar, dan format rupiah.
-*   **Statistical Logic Tests**: Memvalidasi ketepatan kalkulasi Z-Score dan rata-rata bergerak 30 hari (MA30).
-*   **Machine Learning Integration**: Memastikan pelatihan model Prophet, input parameter kearifan lokal (*extra regressors*), dan ekspor prediksi berjalan tanpa kegagalan memori.
-*   **JSON Sanitation**: Memastikan konversi nilai kosong (`NaN`) menjadi `null` standar JSON agar tidak merusak antarmuka dasbor.
+*   `tests/test_etl.py`: Memverifikasi kebenaran pembersihan data, penanganan string kosong, deteksi format tanggal tidak standar, dan format rupiah.
+*   `tests/test_anomaly.py`: Memvalidasi ketepatan kalkulasi Z-Score dan rata-rata bergerak 30 hari (MA30).
+*   `tests/test_forecast.py`: Memastikan pelatihan model Prophet, input parameter kearifan lokal (*extra regressors*), dan ekspor prediksi berjalan tanpa kegagalan memori.
+*   `tests/test_config.py`: Memvalidasi integritas konfigurasi komoditas dan pemetaan kategori.
+*   `tests/test_scraper.py`: Menguji kepatuhan penarikan data scraper harian dari situs PIHPS.
+*   `tests/test_telegram_alert.py`: Memastikan modul bot Telegram dapat merumuskan pesan anomali secara valid.
+*   `tests/test_baseline.py`: Memverifikasi logika evaluasi model pembanding.
 
 Seluruh pengujian dapat dipicu secara lokal dengan perintah:
 ```bash
@@ -198,7 +205,7 @@ make test
 ### 🚶‍♂️ Alur Penggunaan Dasbor (Step-by-Step)
 
 #### 1. Pemantauan Makro (Tab "Executive")
-*   **Langkah 1:** Buka tautan dasbor. Pengguna akan langsung diarahkan ke halaman utama **Executive**.
+*   **Langkah 1:** Buka dasbor. Pengguna akan langsung diarahkan ke halaman utama **Executive**.
 *   **Langkah 2:** Periksa kartu metrik utama di bagian atas (Rata-rata Harga Provinsi, Inflasi Tahunan Berjalan, dan Indeks Volatilitas).
 *   **Langkah 3:** Tinjau **Peta Anomali Harga Spasial** di tengah halaman. Cari wilayah kabupaten/kota yang menyala dengan warna **Merah (Kritis, Z-Score > 3σ)** atau **Kuning (Waspada, Z-Score > 2σ)**.
 *   **Langkah 4:** Tinjau bagian **Sistem Peringatan Dini (EWS)** untuk membaca daftar log anomali harga komoditas pangan esensial yang melonjak melampaui batas deviasi wajar hari ini.
@@ -247,21 +254,6 @@ make test
     → Pendeteksian rambatan inflasi antarkomoditas (misal: kenaikan harga pakan jagung ➔ efek domino 7 hari kemudian pada komoditas telur dan daging ayam).
 *   **FASE 3: Machine Learning Multivariat (Q1 2027)**
     → Integrasi data cuaca curah hujan dari BMKG API, data produksi lokal, serta fluktuasi biaya BBM transportasi ke model ML multivariat (seperti Prophet Multivariat atau XGBoost).
-*   **FASE 4: Rekayasa Kualitas Data & Optimasi Skalabilitas Pipeline (Peta Jalan Teknis)**
-    → Implementasi infrastruktur penanganan data cerdas, penjagaan kualitas data latih model, dan optimalisasi paralelisasi komputasi awan.
-
-### 🗂️ Detail Pengembangan Teknis (Fase 4)
-1.  **Pilar 1: Rekayasa Kualitas & Integrasi Data (Data Engineering)**
-    *   *Penanganan Batas Pergantian Tahun:* Modifikasi scraper agar mendeteksi tahun dari setiap data tanggal secara dinamis agar data lookback akhir tahun tetap masuk ke berkas tahun yang benar (misalnya `2026.json` bukan `2027.json`).
-    *   *Deteksi Gap Otomatis (Self-Healing Backfill):* Subsistem pemindai data harian yang mendeteksi hari-hari kosong dalam 30 hari terakhir untuk membuat antrean penarikan data (*backfill queue*) otomatis saat server BI kembali *online*.
-    *   *Penyelarasan Nama Komoditas Dinamis (Fuzzy String Matching):* Menggunakan algoritma jarak Levenshtein (`difflib` di Python) untuk memetakan nama komoditas secara adaptif mencegah kegagalan ETL akibat perubahan nama dari API BI.
-2.  **Pilar 2: Optimasi Model & Machine Learning (MLOps & Analytics)**
-    *   *Pelatihan Jendela Bergerak (Sliding Window Training - 730 Days):* Membatasi sejarah data latih Prophet secara konstan hanya untuk data **2 tahun terakhir** guna menghindari *Concept Drift* dan mempercepat durasi pelatihan.
-    *   *Penyaringan Outlier Ekstrem (Data Winsorization / Clipping):* Menerapkan pemotongan harga otomatis pada data latih jika terdeteksi lonjakan anomali sesaat ($> 3\sigma$) agar garis tren peramalan tidak rusak.
-    *   *Proteksi Batas Harga Logis (Forecast Sanity Constraint):* Menerapkan pemotongan otomatis (*clipping*) pada batas bawah harga prediksi agar tidak pernah menyentuh nilai di bawah Rp 0.
-3.  **Pilar 3: Skalabilitas Cloud & Efisiensi Infrastruktur (DevOps & Serverless)**
-    *   *Pelatihan Model Paralel (Multiprocessing):* Melakukan *paralelisasi* proses pelatihan 84 model Prophet menggunakan modul `multiprocessing` di Python Azure Functions untuk memotong waktu eksekusi menjadi belasan detik.
-    *   *Pemantauan Drift Model Terpusat:* Mengintegrasikan metrik evaluasi harian (MAE, RMSE, MAPE) yang dicatat via MLflow ke dashboard Azure Machine Learning Studio secara visual.
 
 ---
 
@@ -287,24 +279,44 @@ git clone https://github.com/aceh-resilience-monitor/Aceh-Resilience-Monitor.git
 cd Aceh-Resilience-Monitor
 ```
 
-### 2. Install Dependensi Python
+### 2. Konfigurasi Kredensial Lokal (.env)
+Buat berkas `.env` di direktori root proyek untuk menyimpan konfigurasi Azure secara aman (berkas ini diabaikan oleh Git):
+```env
+ARM_AZURE_CONNECTION_STRING="DefaultEndpointsProtocol=https;AccountName=your_account;AccountKey=your_key;..."
+ARM_AZURE_FUNCTION_APP="your_function_app_name"
+ARM_AZURE_RESOURCE_GROUP="your_resource_group"
+ARM_AZURE_FUNCTION_NAME="arm_daily_pipeline"
+ARM_AZURE_APP_INSIGHTS_ID="your_app_insights_guid"
+ARM_AZURE_SUBSCRIPTION_ID="your_subscription_guid"
+```
+
+### 3. Install Dependensi Python
 ```bash
 pip install -r requirements.txt
 ```
 
-### 3. Jalankan Pengujian Kode (Unit Tests)
+### 4. Jalankan Pengujian Kode (Unit Tests)
 ```bash
-pytest
+make test
 ```
 
-### 4. Eksekusi Pipeline Data Secara Lokal
+### 5. Eksekusi Pipeline Data Secara Lokal
 ```bash
-python scripts/prepare_dashboard_data.py
+make run-local
 ```
-*Perintah ini akan membaca data historis, memicu scraper, menghitung Z-Score, melatih model Prophet, dan mengompres berkas JSON menjadi `dashboard/dashboard_data.json`.*
+*Perintah ini akan mengeksekusi prepare_dashboard_data.py secara lokal.*
 
-### 5. Jalankan Dasbor Secara Lokal
-Buka berkas `dashboard/index.html` menggunakan peramban web Anda.
+### 6. Jalankan Evaluasi Model Baseline
+Untuk membandingkan performa Prophet vs Naive/SMA/EMA:
+```bash
+make evaluate-baseline
+```
+
+### 7. Jalankan Dasbor Secara Lokal
+```bash
+make serve
+```
+*Buka browser di http://localhost:8000 untuk berinteraksi dengan dasbor lokal.*
 
 ---
 
@@ -314,31 +326,60 @@ Buka berkas `dashboard/index.html` menggunakan peramban web Anda.
 datathon-dicoding/
 ├── Data/                               # Dataset mentah PIHPS (Excel)
 ├── azure-functions/                    # Pipeline ETL & ML Serverless (Azure Functions Python)
+│   ├── function_app.py                 # Endpoint pemicu pipeline harian
+│   ├── requirements.txt                # Dependensi serverless
+│   ├── local.settings.json             # Konfigurasi lokal serverless (ignore git)
+│   └── scripts/                        # Modul backend di cloud
+│       ├── etl.py                      # ETL dengan penanda Meugang/Ramadan
+│       ├── forecast.py                 # Logika peramalan Prophet
+│       ├── scraper.py                  # Scraper PIHPS harian
+│       ├── telegram_alert.py           # Pengiriman notifikasi EWS
+│       └── train_with_mlflow.py        # MLOps Azure ML Studio
 ├── dashboard/                          # Frontend Dashboard (HTML/CSS/JS)
-│   ├── index.html                      # Tampilan antarmuka utama
-│   ├── app.js                          # Logika Chart.js + Leaflet.js
-│   ├── style.css                       # Desain Dark Glassmorphism
-│   └── staticwebapp.config.json        # Konfigurasi SWA & CORS
-├── scripts/                            # Skrip pemrosesan lokal
-│   ├── etl.py                          # Skrip ETL in-memory
-│   ├── anomaly.py                      # Kalkulasi Z-Score & MA30
-│   ├── forecast.py                     # Pelatihan 84 model Prophet
-│   ├── evaluate_baseline.py            # Pengujian komparatif model
-│   └── prepare_dashboard_data.py       # Orchestrator lokal
+│   ├── index.html                      # Tampilan antarmuka utama dasbor
+│   ├── app.js                          # Logika visualisasi Chart.js + Leaflet.js
+│   ├── style.css                       # Desain bertema Dark Glassmorphism
+│   ├── dashboard_data.json             # Data visualisasi terkompresi
+│   └── staticwebapp.config.json        # Konfigurasi SWA & aturan CORS
+├── scripts/                            # Skrip pembantu & pemrosesan lokal
+│   ├── etl.py                          # Modul ETL lokal
+│   ├── config.py                       # Kamus kategori & nama komoditas
+│   ├── anomaly.py                      # Kalkulasi anomali Z-Score & MA30
+│   ├── forecast.py                     # Peramalan model Prophet lokal
+│   ├── scraper.py                      # Scraper PIHPS lokal
+│   ├── telegram_alert.py           # Notifikasi Telegram lokal
+│   ├── train_with_mlflow.py        # Log eksperimen MLOps lokal
+│   ├── save_plots.py                   # Pembuat berkas visualisasi plot EDA
+│   ├── evaluate_baseline.py            # Skrip evaluasi model benchmark
+│   ├── prepare_dashboard_data.py       # Orchestrator lokal pembangun JSON dasbor
+│   ├── eda.ipynb                       # Notebook Exploratory Data Analysis (storytelling)
+│   └── evaluate_prophet.ipynb          # Notebook evaluasi visual model Prophet
 ├── tests/                              # Berkas unit tests (pytest)
-│   ├── test_etl.py
-│   ├── test_anomaly.py
-│   ├── test_forecast.py
-│   └── test_baseline.py
+│   ├── conftest.py                     # Konfigurasi fixtures pengujian
+│   ├── test_etl.py                     # Pengujian in-memory ETL
+│   ├── test_anomaly.py                 # Pengujian kalkulasi Z-Score & MA30
+│   ├── test_forecast.py                # Pengujian pelatihan Prophet
+│   ├── test_config.py                  # Pengujian validitas konfigurasi komoditas
+│   ├── test_scraper.py                 # Pengujian API scraper PIHPS
+│   ├── test_telegram_alert.py          # Pengujian perumusan pesan alert
+│   └── test_baseline.py                # Pengujian pembanding model benchmark
 ├── docs/                               # Dokumentasi analisis pendukung
-│   ├── eda_interpretation.md           # Laporan analisis EDA
-│   ├── data_dictionary.md              # Kamus data JSON
-│   ├── azure_architecture.md           # Laporan arsitektur Azure
-│   └── strategy/                       # Panduan strategi tim
-│       └── 01_arm_audit_report.md      # Laporan QA & Penjaminan Mutu
-├── evaluation_prophet.md               # Laporan evaluasi model AI
+│   ├── eda_interpretation.md           # Laporan interpretasi visualisasi EDA
+│   ├── data_dictionary.md              # Kamus data JSON payload dasbor
+│   ├── azure_architecture.md           # Laporan arsitektur awan Microsoft Azure
+│   └── strategy/                       # Laporan strategi taktis tim
+│       ├── 01_arm_audit_report.md      # Laporan kepatuhan QA kurikulum
+│       ├── 02_arm_roasting_report.md   # Justifikasi arsitektur & defense ML
+│       ├── 03_arm_battle_plan.md       # Target eksekusi timeline tim
+│       ├── 04_azure_implementation_guide.md # Pemasangan fungsi serverless
+│       ├── 05_arm_workflow_dataflow.md # Diagram dataflow & relasi file
+│       ├── 06_arm_final_implementation_plan.md # Evaluasi akhir submission
+│       └── 07_arm_architecture_blueprint.md # Arsitektur serverless Azure
+├── evaluation_prophet.md               # Laporan evaluasi model Prophet
 ├── project_brief_final.md              # Project Brief submission
-├── requirements.txt                    # Dependensi Python
+├── requirements.txt                    # Dependensi Python lokal
+├── Makefile                            # Automator CLI pintas lokal
+├── .env                                # Konfigurasi rahasia lokal (ignore git)
 └── README.md                           # Berkas dokumentasi utama ini
 ```
 
@@ -348,9 +389,9 @@ datathon-dicoding/
 
 *   **Aplikasi / Live Dashboard:** [https://thankful-river-084494910.7.azurestaticapps.net](https://thankful-river-084494910.7.azurestaticapps.net)
 *   **Repository GitHub:** [https://github.com/aceh-resilience-monitor/Aceh-Resilience-Monitor.git](https://github.com/aceh-resilience-monitor/Aceh-Resilience-Monitor.git)
-*   **Slide Presentasi:** [Tautan Slide Presentasi (Google Slides)](https://docs.google.com/presentation/d/your-presentation-id/edit?usp=sharing)
-*   **Video Presentasi Proyek:** [Tautan Video Presentasi (YouTube)](https://www.youtube.com/watch?v=your-presentation-video)
-*   **Video Teaser Produk:** [Tautan Video Teaser Produk (YouTube)](https://www.youtube.com/watch?v=your-teaser-video)
+*   **Slide Presentasi:** **[Perlu Verifikasi]** Tautan Google Slides (Akan diperbarui oleh tim setelah presentasi final diunggah)
+*   **Video Presentasi Proyek:** **[Perlu Verifikasi]** Tautan Video YouTube (Akan diperbarui oleh tim setelah rekaman presentasi diunggah)
+*   **Video Teaser Produk:** **[Perlu Verifikasi]** Tautan Video Teaser YouTube (Akan diperbarui oleh tim setelah teaser diunggah)
 
 ---
 *Proyek ini dikembangkan oleh Tim Aceh Resilience Monitor untuk kompetisi **Datathon Dicoding × Microsoft Elevate Training Center 2026**.*
