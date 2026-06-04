@@ -256,16 +256,57 @@ Proyek ARM saat ini berstatus **100% Selesai & Teruji** untuk seluruh fungsional
 
 ## 🔮 16. Roadmap Pengembangan Selanjutnya
 
-```
-FASE 1: Pilot Project TPID (Q3 2026)
-  → Uji coba operasional dasbor di lingkungan Satgas Pangan & TPID Provinsi Aceh.
-  
-FASE 2: Analisis Korelasi Lintas Pangan (Q4 2026)
-  → Pendeteksian rambatan inflasi (misal: pakan jagung naik ➔ 7 hari kemudian telur naik).
-  
-FASE 3: Machine Learning Multivariat (Q1 2027)
-  → Integrasi data cuaca curah hujan BMKG API dan biaya BBM transportasi ke model XGBoost/Prophet.
-```
+Untuk menjamin keberlanjutan, akurasi peramalan, dan skalabilitas sistem Aceh Resilience Monitor (ARM), kami merancang peta jalan pengembangan lanjutan yang terbagi menjadi 4 Fase Taktis serta 3 Pilar Rekayasa Utama:
+
+### 📋 Ringkasan Fase Strategis
+*   **FASE 1: Pilot Project TPID (Q3 2026)**
+    → Uji coba operasional dasbor di lingkungan Satgas Pangan & TPID Provinsi Aceh untuk menyelaraskan alur kerja taktis.
+*   **FASE 2: Analisis Korelasi Lintas Pangan (Q4 2026)**
+    → Pendeteksian rambatan inflasi antarkomoditas (misal: kenaikan harga pakan jagung ➔ efek domino 7 hari kemudian pada komoditas telur dan daging ayam).
+*   **FASE 3: Machine Learning Multivariat (Q1 2027)**
+    → Integrasi data cuaca curah hujan dari BMKG API, data produksi lokal, serta fluktuasi biaya BBM transportasi ke model ML multivariat (seperti Prophet Multivariat atau XGBoost).
+*   **FASE 4: Rekayasa Kualitas Data & Optimasi Skalabilitas Pipeline (Peta Jalan Teknis)**
+    → Implementasi infrastruktur penanganan data cerdas, penjagaan kualitas data latih model, dan optimalisasi paralelisasi komputasi awan.
+
+---
+
+### 🗂️ Detail Pengembangan Teknis (Fase 4)
+
+#### 1. Pilar 1: Rekayasa Kualitas & Integrasi Data (Data Engineering)
+Fokus utama pilar ini adalah untuk memastikan ketersediaan data harian selalu bersih, bebas dari kesalahan rilis, dan tahan terhadap gangguan server pihak ketiga.
+*   **Penanganan Batas Pergantian Tahun (*Year-End Boundary Lookback*)**
+    *   *Deskripsi*: Modifikasi scraper agar mendeteksi tahun dari setiap data tanggal yang berhasil di-scrape secara dinamis.
+    *   *Tujuan*: Menjamin data *lookback* di akhir tahun (misalnya tanggal 30-31 Desember) yang di-scrape pada awal Januari tetap masuk ke berkas tahun yang benar (misalnya `2026.json` bukan `2027.json`).
+*   **Deteksi Gap Otomatis (*Self-Healing Backfill*)**
+    *   *Deskripsi*: Membuat subsistem pemindai data harian yang mendeteksi hari-hari kosong dalam 30 hari terakhir. Jika ditemukan hari kosong (akibat server BI mati lama), sistem otomatis membuat antrean penarikan data (*backfill queue*) saat server BI kembali *online*.
+    *   *Tujuan*: Menutup celah data (*data gaps*) secara otomatis tanpa intervensi manual dari administrator.
+*   **Penyelarasan Nama Komoditas Dinamis (*Fuzzy String Matching*)**
+    *   *Deskripsi*: Menggunakan algoritma jarak Levenshtein (`difflib` di Python) untuk memetakan nama komoditas dari API BI ke standar ARM secara adaptif.
+    *   *Tujuan*: Mencegah kegagalan ETL ketika admin BI Hargapangan mengubah nama komoditas secara tiba-tiba (seperti penambahan spasi atau tanda kurung satuan).
+
+#### 2. Pilar 2: Optimasi Model & Machine Learning (MLOps & Analytics)
+Fokus utama pilar ini adalah menjaga stabilitas performa model peramalan Meta Prophet dari gangguan *noise* data ekstrem.
+*   **Pelatihan Jendela Bergerak (*Sliding Window Training - 730 Days*)**
+    *   *Deskripsi*: Membatasi sejarah data latih Prophet secara konstan hanya untuk data **2 tahun terakhir (730 hari)**.
+    *   *Tujuan*: Menghindari *Concept Drift* (data lama tahun 2021-2022 sudah tidak relevan dengan perilaku pasar tahun 2026) dan memotong waktu eksekusi pelatihan.
+*   **Penyaringan Outlier Ekstrem (*Data Winsorization / Clipping*)**
+    *   *Deskripsi*: Menerapkan pemotongan harga otomatis pada data latih jika terdeteksi lonjakan anomali sesaat ($> 3\sigma$).
+    *   *Tujuan*: Menjaga agar garis tren peramalan Prophet tidak rusak akibat fluktuasi jangka pendek yang ekstrem.
+*   **Imputasi Data Kosong ML (*Forward Fill Constraint*)**
+    *   *Deskripsi*: Mengisi kekosongan data jangka pendek (akhir pekan/hari libur) secara dinamis menggunakan harga terakhir yang dilaporkan (maksimum 7 hari berturut-turut) sebelum dimasukkan ke model pelatihan.
+    *   *Tujuan*: Menjaga deret waktu tetap kontinu agar model Prophet tidak bias atau mengalami kegagalan fitting.
+*   **Proteksi Batas Harga Logis (*Forecast Sanity Constraint*)**
+    *   *Deskripsi*: Menerapkan pemotongan otomatis (*clipping*) pada batas bawah harga prediksi agar tidak pernah menyentuh nilai negatif (di bawah Rp 0).
+    *   *Tujuan*: Mencegah visualisasi grafik dasbor menampilkan harga di bawah Rp 0 jika terjadi tren penurunan yang terlalu tajam.
+
+#### 3. Pilar 3: Skalabilitas Cloud & Efisiensi Infrastruktur (DevOps & Serverless)
+Fokus utama pilar ini adalah mengoptimalkan infrastruktur serverless Azure Functions agar lebih hemat biaya dan memiliki performa tinggi.
+*   **Pelatihan Model Paralel (*Multiprocessing*)**
+    *   *Deskripsi*: Melakukan *paralelisasi* proses pelatihan 84 model Prophet menggunakan modul `multiprocessing` di Python Azure Functions.
+    *   *Tujuan*: Memanfaatkan multi-core CPU pada Azure secara maksimal dan memangkas durasi eksekusi fungsi dari menit menjadi hanya belasan detik.
+*   **Pemantauan Drift Model Terpusat (*Model & Data Drift Monitoring*)**
+    *   *Deskripsi*: Mengintegrasikan metrik evaluasi harian (MAE, RMSE, MAPE) yang dicatat via MLflow ke dashboard Azure Machine Learning Studio secara visual.
+    *   *Tujuan*: Memudahkan tim teknis mendeteksi secara dini apabila performa prediksi model di wilayah tertentu mulai menurun tajam (*model degradation*).
 
 ---
 
@@ -326,10 +367,11 @@ Untuk memperdalam pemahaman juri dan *stakeholders* terhadap proyek **Aceh Resil
 ---
 
 ### 🔮 3. Rencana Pengembangan ke Depan (Roadmap)
-Sesuai dengan cetak biru yang tertera pada **Bab 16**, rencana aksi ARM mencakup tiga fase taktis:
+Sesuai dengan cetak biru yang tertera pada **Bab 16**, rencana aksi ARM mencakup empat fase strategis dan tiga pilar rekayasa utama:
 *   **Fase 1 (Q3 2026):** Pilot Project implementasi langsung di Disperindag dan Satgas Pangan Provinsi Aceh.
 *   **Fase 2 (Q4 2026):** Pengembangan machine learning untuk menganalisis korelasi lintas pangan (rambatan inflasi dari komoditas pakan ke komoditas hilir).
 *   **Fase 3 (Q1 2027):** Integrasi data cuaca curah hujan BMKG API dan data harga BBM ke dalam model ML multivariat (XGBoost & Prophet).
+*   **Fase 4 (Peta Jalan Teknis):** Peningkatan ketahanan pipa data, penjagaan data latih model, dan optimalisasi skalabilitas serverless cloud (selengkapnya pada **Bab 16**).
 
 ---
 

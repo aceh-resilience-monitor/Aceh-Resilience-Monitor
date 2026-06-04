@@ -166,7 +166,22 @@ def _forecast_single_series(
         )
         return None
 
-    prophet_df = df_series[['date', 'price']].rename(
+    # 1. Urutkan data secara kronologis
+    df_sorted = df_series.sort_values('date')
+    
+    # 2. Lakukan reindeks agar menyertakan semua tanggal harian (termasuk bolong akhir pekan/libur)
+    full_range = pd.date_range(start=df_sorted['date'].min(), end=df_sorted['date'].max(), freq='D')
+    df_reindexed = df_sorted.set_index('date').reindex(full_range)
+    
+    # 3. Lakukan imputasi Forward Fill (ffill) dengan batas maksimal 7 hari berturut-turut
+    df_reindexed['price'] = df_reindexed['price'].ffill(limit=7)
+    
+    # 4. Buang baris yang masih NaN setelah ffill (jika gap terlalu besar > 7 hari)
+    df_clean = df_reindexed.dropna(subset=['price']).reset_index()
+    df_clean.rename(columns={'index': 'date'}, inplace=True)
+    
+    # 5. Konversi ke kolom format Prophet
+    prophet_df = df_clean[['date', 'price']].rename(
         columns={'date': 'ds', 'price': 'y'}
     ).copy()
     prophet_df['ds'] = pd.to_datetime(prophet_df['ds'])

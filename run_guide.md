@@ -2,6 +2,9 @@
 
 Dokumen ini berisi kumpulan perintah (syntax) yang diperlukan untuk menjalankan sistem ARM (baik lokal maupun cloud), memantau log, serta cara menyelesaikan error yang mungkin terjadi. Dokumen ini dirancang agar Anda dapat mendemonstrasikannya dengan lancar kepada juri.
 
+> [!TIP]
+> **Shortcut Makefile**: Untuk mempermudah dan mempercepat demonstrasi di depan juri, kami telah membuat berkas [Makefile](file:///Users/auliamuzhaffar/Documents/Datathon/datathon-dicoding/Makefile) di root proyek. Anda cukup menjalankan perintah singkat seperti `make run-local` atau `make deploy-functions` di terminal daripada mengetik perintah yang panjang. Ketik `make` atau `make help` di terminal untuk melihat daftar lengkap perintah.
+
 ---
 
 ## 💻 1. Pengujian & Eksekusi Lokal

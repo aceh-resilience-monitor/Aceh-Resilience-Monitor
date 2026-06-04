@@ -140,23 +140,12 @@ def process_date(date_str: str, existing_keys: set) -> List[dict]:
             # Sleep to respect API rate limits
             time.sleep(0.5)
             
-    if has_data and daily_data:
-        new_entries = []
-        for item in daily_data:
-            key = generate_key(item)
-            if key not in existing_keys:
-                existing_keys.add(key)
-                new_entries.append(item)
-        return new_entries
-    else:
-        logger.info("No data found from API for date: %s", date_str)
-        return []
+    return daily_data if (has_data and daily_data) else []
 
 def scrape_daily_pihps(existing_records: List[dict], run_date: Optional[str] = None) -> List[dict]:
     """
     Main orchestrator for daily scraping.
-    If run_date is None, defaults to today.
-    If today's data is empty, looks back 7 days to fetch missing updates.
+    Runs a constant 3-day lookback window to capture late updates and overwrite stale data.
     """
     logger.info("Starting PIHPS daily scraper orchestrator...")
     
@@ -169,38 +158,33 @@ def scrape_daily_pihps(existing_records: List[dict], run_date: Optional[str] = N
     else:
         today_dt = datetime.now()
         
-    today_str = today_dt.strftime("%Y-%m-%d")
-    
-    # Create O(1) lookup set for existing records
-    existing_keys = set()
-    for item in existing_records:
-        existing_keys.add(generate_key(item))
-        
-    logger.info("Initialized deduplicator with %d existing keys.", len(existing_keys))
-    
-    # 1. Fetch today's data
-    today_new_entries = process_date(today_str, existing_keys)
+    # Tentukan jendela lookback (3 hari terakhir: hari ini, kemarin, lusa kemarin)
+    dates_to_check = [
+        (today_dt - timedelta(days=i)).strftime("%Y-%m-%d")
+        for i in range(3)
+    ]
     
     total_new_entries = []
+    dates_successfully_scraped = set()
     
-    # 2. If no data today, run lookback check for the last 7 days
-    if not today_new_entries:
-        logger.info("No new records found for today (%s). Running 7-day lookback pipeline...", today_str)
-        for i in range(1, 8):
-            past_dt = today_dt - timedelta(days=i)
-            past_date_str = past_dt.strftime("%Y-%m-%d")
-            past_entries = process_date(past_date_str, existing_keys)
-            if past_entries:
-                logger.info("Found %d new records on past date: %s", len(past_entries), past_date_str)
-                total_new_entries.extend(past_entries)
-    else:
-        logger.info("Found %d new records for today (%s).", len(today_new_entries), today_str)
-        total_new_entries.extend(today_new_entries)
-        
+    for date_str in dates_to_check:
+        daily_data = process_date(date_str, set())
+        if daily_data:
+            logger.info("Successfully fetched %d records for date: %s", len(daily_data), date_str)
+            total_new_entries.extend(daily_data)
+            dates_successfully_scraped.add(date_str)
+            
     if total_new_entries:
-        logger.info("Successfully fetched %d new total records from PIHPS.", len(total_new_entries))
+        # OVERWRITE LOGIC: Modifikasi list existing_records in-place untuk membuang data lama
+        # dari tanggal-tanggal yang berhasil di-scrape ulang.
+        existing_records[:] = [
+            r for r in existing_records 
+            if r.get('tanggal') not in dates_successfully_scraped
+        ]
+        logger.info("Cleaned existing records for successfully scraped dates: %s", list(dates_successfully_scraped))
+        logger.info("Successfully fetched %d total records from PIHPS.", len(total_new_entries))
     else:
-        logger.info("No new records found. System is already up to date.")
+        logger.info("No new records found in lookback window.")
         
     return total_new_entries
 

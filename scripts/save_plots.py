@@ -223,12 +223,14 @@ def main():
     logger.info("Plot 8: Correlation heatmap...")
     price_wide = df_clean.pivot_table(index='date', columns='commodity', values='price')
     price_wide.columns.name = None
-    corr = price_wide.corr()
+    price_wide_sorted = price_wide.sort_index()
+    returns_wide = price_wide_sorted.pct_change()
+    corr = returns_wide.corr()
     mask = np.triu(np.ones_like(corr, dtype=bool))
     fig, ax = plt.subplots(figsize=(16, 14))
     sns.heatmap(corr, mask=mask, annot=True, fmt='.2f', cmap='RdBu_r', center=0, vmin=-1, vmax=1,
-                linewidths=0.5, ax=ax, annot_kws={'size': 8}, cbar_kws={'label': 'Pearson Correlation'})
-    ax.set_title(f'Price Correlation Matrix ({years[0]}-{years[-1]})', fontsize=15, fontweight='bold')
+                linewidths=0.5, ax=ax, annot_kws={'size': 8}, cbar_kws={'label': 'Pearson Correlation (Daily Returns)'})
+    ax.set_title(f'Daily Returns Correlation Matrix ({years[0]}-{years[-1]})', fontsize=15, fontweight='bold')
     ax.tick_params(axis='both', labelsize=9)
     plt.tight_layout()
     plt.savefig(f'{PLOT_DIR}/08_correlation_matrix.png', bbox_inches='tight')

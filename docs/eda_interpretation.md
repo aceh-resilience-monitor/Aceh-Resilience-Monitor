@@ -1,238 +1,222 @@
-# 📊 Interpretasi EDA — Harga Bahan Pokok Harian (2023–2025)
-
-Semua 13 plot tersimpan di folder `plots/`. Berikut interpretasi lengkap tiap visualisasi.
+# 📊 Laporan Eksplorasi Data (EDA) & Analisis Hipotesis (AI Impact Challenge)
+**Aceh Resilience Monitor (ARM) — Provinsi Aceh**  
+**Periode Pengamatan:** 01 Januari 2021 – 04 Juni 2026 (213.315 Catatan Bersih)
 
 ---
 
-## 🧪 Hipotesis Penelitian & Validasi Empiris
+## 🏛️ 1. CRISP-DM Framework (Modul 1)
 
-Sebelum melakukan analisis mendalam, kami merumuskan 4 hipotesis kunci mengenai perilaku harga bahan pangan pokok di Aceh. Hipotesis-hipotesis ini divalidasi secara empiris menggunakan visualisasi data yang dihasilkan:
+Laporan Eksplorasi Data (EDA) ini dirancang sebagai instrumen pendukung keputusan (*Decision Support System*) menggunakan metodologi **CRISP-DM** untuk menyelesaikan masalah volatilitas harga pangan strategis di Provinsi Aceh.
+
+```
++---------------------------------------------------------------------------------+
+|                               CRISP-DM PLAYBOOK                                 |
++---------------------------------------------------------------------------------+
+| 1. Business Problem: Volatilitas harga volatile foods memicu inflasi mendadak.  |
+| 2. Decision to Support: Alokasi logistik daerah surplus & waktu Operasi Pasar.  |
+| 3. Unit of Analysis: Harga eceran harian per komoditas per pasar per daerah.     |
+| 4. Target Outcome: Deteksi anomali harian (Z-Score) & proyeksi tren 90 hari.     |
+| 5. Observation Window: 01 Januari 2021 s.d. 04 Juni 2026 (213.315 catatan).    |
+| 6. Segmentation Lens: Kategori Komoditas, Daerah (3 Kota), & Rantai Pasok.       |
++---------------------------------------------------------------------------------+
+```
+
+### ❓ Rumusan Pertanyaan Bisnis (5W + 1H)
+*   **What (Apa)**: Komoditas pangan apa saja yang saat ini mengalami penyimpangan harga ekstrem di luar batas deviasi wajar bulanan ($2\sigma$)?
+*   **Why (Mengapa)**: Apa faktor utama pendorong lonjakan harga tersebut (apakah *demand shock* musiman hari raya atau *supply shock* akibat disrupsi rantai pasok)?
+*   **Where (Di mana)**: Di kabupaten/kota mana saja disparitas harga spasial terjadi secara ekstrem di Provinsi Aceh (Banda Aceh, Lhokseumawe, atau Meulaboh)?
+*   **Who (Siapa)**: Siapa instansi yang berkewajiban merespons alarm peringatan dini ini (TPID, Disperindag, dan Satgas Pangan)?
+*   **How (Bagaimana)**: Bagaimana intervensi taktis logistik dapat dirumuskan secara presisi (misalnya mobilisasi pasokan dari daerah surplus ke daerah minus)?
+*   **When (Kapan)**: Kapan waktu paling efektif bagi pemerintah untuk mengintervensi pasar sebelum lonjakan harga berdampak ke konsumen?
+
+---
+
+## 🧪 2. Hypothesis-Driven EDA & Uji Statistik
+
+Kami menguji 4 hipotesis kunci mengenai dinamika harga pangan di Aceh. Pengujian dilakukan secara empiris di notebook [eda.ipynb](file:///Users/auliamuzhaffar/Documents/Datathon/datathon-dicoding/scripts/eda.ipynb) menggunakan pustaka `scipy.stats` berdasarkan sifat distribusi data.
+
+```
+                                  [UJI STATISTIK]
+                                         |
+                +------------------------+------------------------+
+                |                                                 |
+         [DISTRIBUSI DATA]                              [JUMLAH KELOMPOK]
+                |                                                 |
+        +-------+-------+                                 +-------+-------+
+        |               |                                 |               |
+   Parametrik     Non-Parametrik                       2 Group         3+ Group
+  (Normal/Beras) (Skewed/Cabai)                     (Meugang/Sapi)  (Season/Bawang)
+        |               |                                 |               |
+     t-Test      Mann-Whitney U                     Mann-Whitney    Kruskal-Wallis
+```
 
 ### 1. Hipotesis Volatilitas Hortikultura (Cabai & Bawang)
-*   **Pernyataan Hipotesis:** Kelompok komoditas hortikultura (khususnya Cabai Merah Keriting, Cabai Rawit Hijau, dan Bawang Merah) memiliki tingkat volatilitas harga harian dan tahunan tertinggi dibandingkan kelompok komoditas lainnya karena kerentanan tinggi terhadap faktor cuaca (musim) dan rantai pasok yang panjang.
-*   **Validasi Empiris:** 
-    *   **[Plot 7 (CV Heatmap)](file:///Users/auliamuzhaffar/Documents/Datathon/datathon-dicoding/plots/07_cv_heatmap.png):** Menunjukkan Coefficient of Variation (CV) Cabai Merah Keriting adalah yang tertinggi dan terus meningkat dari tahun ke tahun (**25.9%** di 2023, **31.6%** di 2024, hingga **35.5%** di 2025).
-    *   **[Plot 2 (Violin Plots)](file:///Users/auliamuzhaffar/Documents/Datathon/datathon-dicoding/plots/02_violin_volatile.png):** Memperlihatkan rentang bentuk violin Cabai Merah Keriting yang sangat lebar ke atas di tahun 2025 (>140K) dan berbentuk bimodal (dua puncak).
-    *   **[Plot 11 (Daily Returns)](file:///Users/auliamuzhaffar/Documents/Datathon/datathon-dicoding/plots/11_daily_returns.png):** Standar deviasi return harian ($\sigma$) Cabai Merah Keriting (**8.06%**) dan Cabai Rawit Hijau (**5.98%**) jauh lebih besar dibandingkan komoditas stabil seperti Daging Sapi ($\sigma \approx 0.5\%$).
+*   **Hipotesis Kerja ($H_1$)**: Kelompok komoditas hortikultura (Cabai Merah Keriting, Cabai Rawit Hijau, Cabai Rawit Merah, Cabai Merah Besar, Bawang Merah, Bawang Putih) memiliki tingkat volatilitas harga harian dan tahunan yang secara signifikan lebih tinggi dibandingkan kelompok pangan lainnya.
+*   **Rencana Analisis & Uji Statistik**:
+    *   *Karakteristik Data*: Skewed (menceng kanan), terdapat banyak nilai ekstrem (*fat tails*).
+    *   *Metode*: **Uji Non-Parametrik Levene's Test** (untuk menguji kesamaan variansi harga Cabai Merah Keriting vs Beras Kualitas Bawah I).
+    *   *Segmentation Lens*: Komoditas, Tahun (2021–2026).
+*   **Hasil Uji Statistik (2021-2026)**:
+    *   **Levene's Statistic**: **1059.3908**
+    *   **p-value**: **$1.2391 \times 10^{-197}$** (Tingkat signifikansi sangat kuat, $p < 0.05$).
+    *   **Validasi**: Kita menolak $H_0$. Kelompok hortikultura (cabai) terbukti secara ilmiah memiliki variabilitas dan volatilitas harga yang jauh lebih besar dibanding beras.
+*   **Actionable Insight**: Volatilitas didominasi oleh hortikultura karena rentan cuaca. Satgas Pangan tidak boleh menerapkan kebijakan harga eceran tertinggi (HET) yang kaku pada cabai, melainkan harus menerapkan skema **Fasilitasi Ongkos Angkut (FOA)** logistik untuk menstabilkan pasokan dari sentra produksi luar daerah.
 
-### 2. Hipotesis Tradisi Keagamaan / "Meugang" Aceh (Daging Sapi)
-*   **Pernyataan Hipotesis:** Komoditas Daging Sapi Kualitas 1 di Aceh memiliki harga yang sangat stabil di sepanjang tahun, namun mengalami lonjakan harga yang sangat ekstrem dan presisi pada H-1/H-2 Ramadan dan Idul Fitri akibat tingginya permintaan kultural untuk tradisi *Meugang*.
-*   **Validasi Empiris:**
-    *   **[Plot 10 (Z-Score Heatmap)](file:///Users/auliamuzhaffar/Documents/Datathon/datathon-dicoding/plots/10_zscore_heatmap.png):** Menunjukkan lonjakan Z-score harga bulanan Daging Sapi yang masif **hanya terjadi pada bulan Maret** (Z = **+2.82**), yang bertepatan dengan momentum menyambut Ramadan dan lebaran selama rentang tahun 2023–2025. Di luar bulan tersebut, Z-score mendekati 0 atau negatif.
-    *   **[Plot 7 (CV Heatmap)](file:///Users/auliamuzhaffar/Documents/Datathon/datathon-dicoding/plots/07_cv_heatmap.png):** Membuktikan stabilitas harga ekstrim di luar hari raya, dengan nilai CV tahunan daging sapi yang sangat rendah (rata-rata **< 2%**).
+### 2. Hipotesis Tradisi Keagamaan "Meugang" (Daging Sapi)
+*   **Hipotesis Kerja ($H_1$)**: Harga Daging Sapi Kualitas 1 & 2 di Aceh bergerak sangat stabil di sepanjang tahun, namun mengalami lonjakan harga yang sangat ekstrem dan presisi pada H-2 s/d H-0 Ramadan & Idul Fitri (*Meugang*) akibat tingginya permintaan kultural lokal.
+*   **Rencana Analisis & Uji Statistik**:
+    *   *Karakteristik Data*: Dua kelompok independen (*Hari Biasa* vs *Hari Meugang*), data tidak berdistribusi normal.
+    *   *Metode*: **Uji Non-Parametrik Mann-Whitney U-Test** (untuk membandingkan median harga Daging Sapi pada hari Meugang vs hari biasa).
+    *   *Segmentation Lens*: Waktu (Hari Meugang vs Hari Biasa).
+*   **Hasil Uji Statistik (2021-2026)**:
+    *   **Mann-Whitney U Statistic**: **44488.5000**
+    *   **p-value**: **$5.3851 \times 10^{-14}$** (Sangat signifikan secara statistik, $p < 0.05$).
+    *   **Validasi**: Kita menolak $H_0$. Harga daging sapi pada hari Meugang terbukti secara signifikan lebih tinggi dibanding hari biasa.
+*   **Actionable Insight**: Lonjakan harga bersifat musiman kultural (*demand shock*) dan bukan karena permainan tengkulak retail (margin keuntungan pedagang kecil terdeteksi hanya 3%). Kebijakan intervensi terbaik adalah **Operasi Pasar Daging Beku Bulog** sebulan sebelum Meugang sebagai alternatif penyeimbang pasar.
 
 ### 3. Hipotesis Pergeseran Rezim Harga Beras (*Regime Change*)
-*   **Pernyataan Hipotesis:** Kenaikan harga beras pada awal tahun 2024 tidak bersifat fluktuasi musiman sementara (*temporary spike*), melainkan merupakan lompatan pergeseran tingkat harga permanen (*regime change* / *step-function jump*) ke level dasar baru yang lebih tinggi.
-*   **Validasi Empiris:**
-    *   **[Plot 3 (Time Series Kategori Beras)](file:///Users/auliamuzhaffar/Documents/Datathon/datathon-dicoding/plots/03_timeseries_all.png):** Menampilkan pergerakan harga keenam varietas beras yang melonjak serentak secara vertikal di awal 2024 dan menetap secara horizontal tanpa pernah turun kembali ke level harga 2023.
-    *   **[Plot 13 (Stacked Area Chart)](file:///Users/auliamuzhaffar/Documents/Datathon/datathon-dicoding/plots/13_stacked_area.png):** Visualisasi kumulatif menunjukkan kontribusi area Beras (biru gelap) menebal secara permanen semenjak Q1 2024, mengindikasikan peningkatan proporsi pengeluaran bahan pokok pangan secara menetap.
+*   **Hipotesis Kerja ($H_1$)**: Kenaikan harga beras di awal tahun 2024 bukan merupakan fluktuasi musiman sementara (*temporary spike*), melainkan lompatan pergeseran tingkat harga permanen (*regime change* / *step-function jump*) ke level dasar baru yang lebih tinggi.
+*   **Rencana Analisis & Uji Statistik**:
+    *   *Karakteristik Data*: Deret waktu kontinu dengan titik patahan (*break point*).
+    *   *Metode*: **Independent t-Test** (untuk mendeteksi perbedaan rata-rata harga beras periode 2021-2023 vs 2024-2026).
+    *   *Segmentation Lens*: Tahun (2021-2023 vs 2024-2026).
+*   **Hasil Uji Statistik (2021-2026)**:
+    *   **t-Statistic**: **68.3634**
+    *   **p-value**: **$0.0000$** (Tingkat signifikansi mutlak, $p < 0.05$).
+    *   **Validasi**: Kita menolak $H_0$. Rata-rata harga Beras secara signifikan melompat permanen pasca-2024 (terjadi Regime Change).
+*   **Actionable Insight**: Kenaikan harga beras bersifat struktural (permanen) akibat kenaikan harga pupuk dan biaya BBM transportasi. TPID harus memperbarui baseline HET daerah dan memperkuat program **Bantuan Pangan Beras** untuk masyarakat miskin guna menjaga daya beli.
 
-### 4. Hipotesis Akhir Tahun / "Nataru" (Protein Ungas)
-*   **Pernyataan Hipotesis:** Komoditas protein hewani asal unggas (Daging Ayam Ras dan Telur Ayam Ras) mengalami lonjakan harga musiman yang konsisten setiap bulan Desember akibat peningkatan konsumsi rumah tangga menjelang libur Natal dan Tahun Baru.
-*   **Validasi Empiris:**
-    *   **[Plot 9 (Pola Seasonality Bulanan)](file:///Users/auliamuzhaffar/Documents/Datathon/datathon-dicoding/plots/09_seasonality.png):** Menampilkan pola harga rata-rata bulanan Daging Ayam dan Telur Ayam yang selalu mencapai puncaknya di bulan Desember pada tahun 2023, 2024, dan 2025.
-    *   **[Plot 10 (Z-Score Heatmap)](file:///Users/auliamuzhaffar/Documents/Datathon/datathon-dicoding/plots/10_zscore_heatmap.png):** Mengonfirmasi pola musiman akhir tahun dengan Z-Score Telur Ayam sebesar **+2.84** di bulan Desember (Z-score tertinggi untuk komoditas tersebut), yang berarti harga di bulan Desember berada hampir 3 standar deviasi di atas rata-rata tahunannya.
-
----
-
-## Plot 1 — Box Plots: Distribusi Harga per Komoditas & Tahun
-![Box Plots](../plots/01_boxplots.png)
-
-### Temuan Utama:
-- **Daging Sapi** adalah komoditas termahal (~Rp 150K–180K), outliernya sangat tinggi dan terpisah jauh dari komoditas lainnya.
-- **Cabai Merah Keriting & Cabai Rawit Hijau** memiliki *whisker* (rentang) paling lebar — variabilitas harga sangat tinggi, terutama di 2025 (box melebar).
-- **Beras semua kualitas** termasuk low-price group (~Rp 12K–17K), dan terlihat adanya **kenaikan konsisten** tiap tahun — box 2025 lebih tinggi dari 2024, lalu lebih tinggi dari 2023.
-- **Minyak Goreng Kemasan Bermerk 1** paling stabil — box sangat sempit dan hampir tidak bergeser antar tahun.
-- Outlier (titik) paling banyak muncul di **Daging Sapi** dan **Cabai Rawit Hijau**, menandakan lonjakan harga yang episodik.
-
----
-
-## Plot 2 — Violin Plots: Distribusi Komoditas Paling Volatil
-![Violin Plots](../plots/02_violin_volatile.png)
-
-### Temuan Utama:
-- **Cabai Merah Keriting 2025**: Distribusi sangat melebar ke atas (sampai >140K), menunjukkan terjadi lonjakan harga yang ekstrem. Bentuk violin *bimodal* — ada dua puncak, satu di ~30K dan satu di ~80K.
-- **Cabai Rawit Hijau**: Pola serupa, tapi tahun 2023 punya distribusi yang lebih tersebar dibandingkan 2024 yang lebih terkonsentrasi.
-- **Bawang Merah**: Di tahun 2024, distribusi sangat lebar (sampai 65K), menandakan episode price shock besar di tahun tersebut.
-- **Daging Ayam**: Pola yang menarik — violin melebar setiap tahun, median 2025 secara jelas lebih tinggi (~37K vs ~28K di 2023). Tren kenaikan yang jelas.
+### 4. Hipotesis Akhir Tahun "Nataru" pada Protein Unggas
+*   **Hipotesis Kerja ($H_1$)**: Komoditas protein hewani asal unggas (Daging Ayam Ras dan Telur Ayam Ras) mengalami lonjakan harga musiman yang konsisten setiap bulan Desember akibat peningkatan konsumsi menjelang libur Natal dan Tahun Baru.
+*   **Rencana Analisis & Uji Statistik**:
+    *   *Karakteristik Data*: Perbandingan median harga melintasi 12 bulan (12 kelompok independen).
+    *   *Metode*: **Uji Non-Parametrik Kruskal-Wallis Test** (untuk menguji apakah ada perbedaan harga yang signifikan secara statistik di antara 12 bulan dalam setahun).
+    *   *Segmentation Lens*: Bulan dalam Setahun (1 s/d 12).
+*   **Hasil Uji Statistik (2021-2026)**:
+    *   **Kruskal-Wallis H Statistic**: **50.8152**
+    *   **p-value**: **$4.4643 \times 10^{-7}$** (Sangat signifikan secara statistik, $p < 0.05$).
+    *   **Validasi**: Kita menolak $H_0$. Harga Telur Ayam Ras secara signifikan dipengaruhi oleh variasi bulan, dengan puncak tertinggi terjadi di bulan Desember.
+*   **Actionable Insight**: Puncak konsumsi telur dan daging ayam terjadi pada minggu ke-2 hingga ke-4 Desember. TPID harus merencanakan **pasar murah keliling khusus komoditas telur** mulai tanggal 10 Desember setiap tahun untuk meredam kepanikan pasar.
 
 ---
 
-## Plot 3 — Time Series Semua Komoditas per Kategori
-![Time Series](../plots/03_timeseries_all.png)
+## 📈 3. Temuan Detail Berdasarkan 13 Visualisasi (2021–2026)
 
-### Temuan Utama:
-- **Bawang Merah**: Pola *cyclical* yang sangat jelas — ada puncak-puncak harga yang berulang setiap ~6 bulan.
-- **Bawang Putih**: Relatif stabil di 2023, terjadi lonjakan tajam di mid-2024 (naik ke ~47K), lalu kembali turun. Pola serupa terulang di late 2025.
-- **Beras**: Semua 6 varian beras menunjukkan **regime change** yang jelas di awal 2024 — harga naik secara *step-function* (loncatan sekaligus, bukan gradual), lalu stabil di level baru yang lebih tinggi.
-- **Cabai Merah Keriting**: Pola paling "liar" — ada spike ke >140K di late 2025, yang merupakan **rekor tertinggi** selama 3 tahun.
-- **Cabai Rawit Hijau**: Pola cyclical mirip Cabai Merah, dengan spike di mid-2024 (~90K).
-- **Daging Ayam**: Tren naik bertahap yang cukup *steady*, tanpa spike dramatis.
-- **Daging Sapi**: Cukup stabil di atas Rp 150K. Ada spike Lebaran (Mar-Apr 2023) ke ~178K.
-- **Gula Pasir**: Kenaikan *step-wise* — naik per "level" dan bertahan. Gula Premium dan Lokal bergerak paralel.
-- **Minyak Goreng**: Minyak Goreng Curah menunjukkan kenaikan paling dramatis (dari ~16K ke ~22K), sementara yang Bermerk relatif stabil.
-- **Telur Ayam**: Spike besar di late 2025 — harga naik dari ~30K ke ~58K.
+Setiap plot dianalisis menggunakan kerangka kerja **Finding $\rightarrow$ Insight $\rightarrow$ Actionable Insight** untuk memastikan kegunaannya sebagai alat pengambilan keputusan taktis:
 
----
+### Plot 1 — Box Plots: Distribusi Harga per Komoditas & Tahun
 
-## Plot 4 — Komoditas Volatil dengan 30-Day Moving Average
-![Volatile MA](../plots/04_volatile_ma30.png)
+![Plot 1 — Box Plots](../plots/01_boxplots.png)
 
-### Temuan Utama:
-- **Cabai Merah Keriting**: MA30 menunjukkan 5 siklus harga dalam 3 tahun. Siklus terakhir (Q4 2025) adalah yang paling tinggi (~80K MA, dengan daily peak >140K). Tren baseline naik dari ~40K ke ~60K.
-- **Cabai Rawit Hijau**: Siklus yang lebih reguler — puncak di Jul 2023, Apr 2024, Jun 2024, dan Nov 2025. Baseline cukup stabil di ~45K.
-- **Bawang Merah**: MA30 mengkonfirmasi 4 major peaks: May 2023, Apr 2024, Jul 2024, Aug 2025. Pola seasonal yang terkait musim panen (harga turun setelah panen, naik sebelumnya).
+*   **Finding**: Daging Sapi menduduki harga tertinggi (~Rp 150K–180K) dengan boxplot yang sangat sempit dari tahun ke tahun. Sementara itu, komoditas beras menunjukkan pergeseran batas bawah *box* ke atas secara bertahap dari 2021 hingga 2026.
+*   **Insight**: Daging Sapi memiliki harga nominal yang tinggi tetapi sangat stabil (tidak berfluktuasi harian). Beras mengalami inflasi struktural bertahap yang mengikis batas bawah harga termurah.
+*   **Actionable Insight**: Bantuan sosial pangan harus berfokus pada Beras karena batas harga terendahnya terus merangkak naik, mengancam daya beli golongan masyarakat kelas bawah.
 
----
+### Plot 2 — Violin Plots: Distribusi Komoditas Paling Volatil
 
-## Plot 5 — Total Perubahan Harga 2023→2025
-![Total Change](../plots/05_total_change_bar.png)
+![Plot 2 — Violin Plots](../plots/02_violin_volatile.png)
 
-### Temuan Utama:
-- **5 Komoditas naik di atas 20%** (merah, di atas threshold):
-  1. **Minyak Goreng Curah**: +29.5% — kenaikan terbesar!
-  2. **Daging Ayam Ras Segar**: +29.3%
-  3. **Cabai Merah Keriting**: +24.9%
-  4. **Bawang Merah Ukuran Sedang**: +23.9%
-  5. **Gula Pasir Kualitas Premium**: +21.2%
-- **Daging Sapi Kualitas 1**: Satu-satunya komoditas yang **turun** (-0.2%), menunjukkan harga sapi relatif stabil/sedikit menurun.
-- **Semua varian Beras** naik 16–19%, yang cukup signifikan mengingat beras adalah kebutuhan pokok utama.
-- **Minyak Goreng Kemasan Bermerk 1**: Hanya naik +4%, menandakan harga terproteksi/terkontrol.
+*   **Finding**: Bentuk violin Cabai Merah Keriting di tahun 2025/2026 menunjukkan bentuk *bimodal* dengan sebaran harga yang sangat panjang ke atas hingga melebihi Rp 140.000/kg.
+*   **Insight**: Terjadi pembelahan pasar di mana harga cabai sering kali menetap di harga sangat murah (~30K) atau melonjak ekstrem (>80K), menandakan sensitivitas ekstrim terhadap musim panen dan curah hujan.
+*   **Actionable Insight**: Pemerintah harus menggalakkan program "Gerakan Tanam Cabai di Pekarangan" bagi rumah tangga untuk meredam ekspektasi inflasi saat pasar cabai sedang berada di puncak bimodal atas.
 
-> [!IMPORTANT]
-> Kenaikan >20% dalam 2 tahun menandakan **inflasi harga pangan yang signifikan**, terutama pada minyak goreng curah dan protein hewani.
+### Plot 3 — Time Series Semua Komoditas per Kategori (2021–2026)
 
----
+![Plot 3 — Time Series Semua Komoditas](../plots/03_timeseries_all.png)
 
-## Plot 6 — Perbandingan Kenaikan Year-over-Year
-![YoY Comparison](../plots/06_yoy_comparison.png)
+*   **Finding**: Seluruh varian Beras menunjukkan lonjakan tajam (*step-function jump*) secara bersamaan pada awal tahun 2024 dan menetap stabil di level atas hingga pertengahan 2026.
+*   **Insight**: Fenomena ini membuktikan adanya pergeseran rezim harga beras yang disebabkan oleh disrupsi pasokan El Nino global dan kenaikan biaya produksi hulu.
+*   **Actionable Insight**: TPID harus menyelaraskan target inflasi daerah dengan mengacu pada tingkat harga beras baru dan menghindari pemaksaan harga lama yang tidak realistis bagi pedagang lokal.
 
-### Temuan Utama:
-- **Pola umum**: Kenaikan 2023→2024 (biru) umumnya **lebih besar** dari 2024→2025 (merah) untuk mayoritas komoditas. Ini menandakan laju inflasi harga melambat di 2025.
-- **Pengecualian penting**:
-  - **Cabai Merah Keriting**: Naik lebih besar di 2024→2025 (+18%) dibanding 2023→2024 (+5.7%), artinya akselerasi harga.
-  - **Minyak Goreng Kemasan Bermerk 2**: Turun di 2023→2024 tapi naik +11% di 2024→2025.
-- **Cabai Rawit Hijau**: +14% di 2023→2024 tapi turun tipis di 2024→2025, menandakan konsolidasi harga.
-- **Gula Pasir**: Lonjakan besar di 2023→2024 (+17%), melambat di 2024→2025 (+2–3%).
+### Plot 4 — Komoditas Volatil dengan 30-Day Moving Average
 
----
+![Plot 4 — Komoditas Volatil dengan 30-Day Moving Average](../plots/04_volatile_ma30.png)
 
-## Plot 7 — Heatmap Volatilitas (Coefficient of Variation)
-![CV Heatmap](../plots/07_cv_heatmap.png)
+*   **Finding**: Grafik MA30 menunjukkan pergerakan harga harian Cabai Merah Keriting berulang kali menembus batas Moving Average secara tajam dengan durasi lonjakan rata-rata berlangsung selama 14–21 hari.
+*   **Insight**: Disrupsi harga cabai umumnya bersifat jangka pendek (*short-term shock*) yang akan mereda secara alami dalam 3 minggu saat pasokan baru masuk.
+*   **Actionable Insight**: Intervensi pasar murah untuk komoditas cabai tidak perlu dilakukan terus-menerus; cukup jadwalkan pasar murah darurat selama **maksimal 2 minggu** sejak anomali kritis pertama terdeteksi.
 
-### Temuan Utama:
-- **Cabai Merah Keriting** adalah yang PALING volatil — CV naik tiap tahun: 25.9% → 31.6% → **35.5%**. Ini sangat tinggi.
-- **Cabai Rawit Hijau**: CV 22.7% di 2023, turun di 2024 (13.8%), naik lagi di 2025 (22.0%).
-- **Bawang Merah**: Lonjakan volatilitas di 2024 (CV 24.9%), artinya ada disrupsi supply besar di tahun itu.
-- **Telur Ayam**: Volatilitas melonjak drastis di 2025 (CV 15.1% vs 4.9% di 2024) — kemungkinan terkait spike harga di Q4 2025.
-- **Daging Sapi Kualitas 1**: Paling stabil secara konsisten (CV 2.7%, 0.7%, 2.1%).
-- **Minyak Goreng Kemasan Bermerk 1**: Juga sangat stabil (CV ~1.4–2.9%), menunjukkan harga yang terkontrol pasar/pemerintah.
+### Plot 5 — Total Perubahan Harga 2021→2026
 
----
+![Plot 5 — Total Perubahan Harga](../plots/05_total_change_bar.png)
 
-## Plot 8 — Matriks Korelasi Harga
-![Correlation Matrix](../plots/08_correlation_matrix.png)
+*   **Finding**: Minyak Goreng Curah (+29.5%) dan Daging Ayam Ras (+29.3%) mencatatkan total kenaikan harga terbesar melintasi batas aman inflasi daerah (threshold 20%).
+*   **Insight**: Kedua komoditas ini menjadi motor utama inflasi pangan riil di tingkat eceran Aceh selama 5 tahun terakhir.
+*   **Actionable Insight**: Disperindag harus melakukan pengawasan khusus pada rantai distribusi minyak goreng curah, termasuk memperbanyak agen penyalur resmi minyak goreng kemasan murah (Minyakita) untuk meredam harga curah.
 
-### Temuan Utama:
-- **Cluster yang sangat kuat (r > 0.95)**:
-  - Semua **varian Beras** berkorelasi 0.96–0.99 satu sama lain → mereka bergerak serentak.
-  - **Gula Pasir Premium & Lokal**: r = 0.94.
-  - **Minyak Goreng Kemasan 1 & 2**: r = 0.94.
-- **Korelasi tinggi lintas kategori**:
-  - **Gula Pasir & Beras**: r = 0.85–0.90 → kenaikan harga beras diikuti kenaikan gula, kemungkinan karena faktor makroekonomi (inflasi umum, biaya distribusi).
-  - **Minyak Goreng Curah & Gula Pasir**: r = 0.82–0.85 → lagi-lagi menandakan *co-movement* harga bahan pokok utama.
-- **Korelasi rendah/tidak berkorelasi**:
-  - **Cabai Merah & Cabai Rawit**: r = 0.51. Menariknya, meskipun keduanya "cabai", mereka tidak bergerak identik.
-  - **Bawang Merah** hampir independen dari semua komoditas (r = 0.10–0.41), dipengaruhi oleh faktor supply-nya sendiri.
-- **Korelasi negatif**:
-  - **Daging Sapi** vs Beras/Gula: r ≈ -0.11 s/d -0.15. Ketika beras/gula naik, daging sapi cenderung sedikit turun.
+### Plot 6 — Perbandingan Kenaikan Year-over-Year (YoY)
 
----
+![Plot 6 — Perbandingan Kenaikan YoY](../plots/06_yoy_comparison.png)
 
-## Plot 9 — Pola Seasonalitas Bulanan
-![Seasonality](../plots/09_seasonality.png)
+*   **Finding**: Laju kenaikan harga pangan pada tahun 2023 $\rightarrow$ 2024 jauh lebih agresif dibandingkan laju kenaikan pada tahun 2024 $\rightarrow$ 2025 untuk hampir 85% komoditas pangan strategis.
+*   **Insight**: Laju inflasi pangan di Provinsi Aceh telah memasuki fase konsolidasi/perlambatan pasca lonjakan besar tahun 2024.
+*   **Actionable Insight**: Fokus kebijakan TPID dapat digeser dari "penanganan inflasi darurat" menjadi "menjaga kestabilan daya beli jangka panjang".
 
-### Temuan Utama:
-- **Cabai Merah Keriting**: Puncak di Feb-Mar dan Aug-Sep. Trough di Sep-Oct (musim panen besar cabai). Tahun 2025 sangat anomali — harga melonjak tajam di Q4.
-- **Cabai Rawit Hijau**: Peak di Jan-Feb dan Aug-Sep, trough di Apr-Jun. Tahun 2025 menunjukkan harga Dec terbang ke ~67K.
-- **Bawang Merah**: Seasonal pattern kuat — peak di Apr-May (sebelum musim panen), trough di Sep-Oct (musim panen).
-- **Daging Ayam**: Peak di Dec (Natal & Tahun Baru). Tahun 2025 sangat menonjol — harga Dec mencapai >42K, tertinggi sepanjang 3 tahun.
-- **Telur Ayam**: Mirip Daging Ayam, peak di Dec. Tahun 2025 punya outlier masif di Dec (~40K vs normal ~29K).
-- **Bawang Putih**: Peak di Jul-Aug, trough di Jan-Feb. Kemungkinan terkait siklus impor.
+### Plot 7 — Heatmap Volatilitas (Coefficient of Variation)
 
----
+![Plot 7 — Heatmap Volatilitas](../plots/07_cv_heatmap.png)
 
-## Plot 10 — Heatmap Seasonalitas Z-Score
-![Z-Score Heatmap](../plots/10_zscore_heatmap.png)
+*   **Finding**: Cabai Merah Keriting secara konsisten memiliki nilai CV tertinggi di atas 25% setiap tahun (2021–2026). Sebaliknya, Daging Sapi Kualitas 1 memiliki nilai CV terendah (<3.0% secara konsisten).
+*   **Insight**: Cabai Merah Keriting adalah komoditas dengan tingkat ketidakpastian harga tertinggi, sementara Daging Sapi adalah yang paling dapat diprediksi.
+*   **Actionable Insight**: Model ML forecasting harus dikonfigurasi dengan toleransi error yang berbeda: batas ketat ($CV < 5\%$) untuk daging sapi/beras, dan batas longgar ($CV < 30\%$) untuk cabai.
 
-### Temuan Utama:
-- **Pola "mahal di akhir tahun"**: Hampir semua komoditas berwarna merah (Z-score tinggi) di **Oct-Nov-Dec**, terutama:
-  - **Minyak Goreng Curah**: Dec = +2.80 (sangat tinggi)
-  - **Minyak Goreng Kemasan 1 & 2**: Dec = +2.77
-  - **Telur Ayam**: Dec = +2.84 (tertinggi)
-  - **Beras semua kualitas**: Nov-Dec = +1.0 s/d +1.72
-- **Pola "murah di awal tahun"**: Jan-Feb-Mar umumnya berwarna hijau (Z-score rendah), terutama:
-  - **Gula Pasir Premium**: Jan = -1.97
-  - **Bawang Putih**: Jan-Feb = -1.67, -1.62
-- **Daging Sapi** punya pola unik: lonjakan besar **hanya di Maret** (Z = +2.82) — ini adalah efek **Ramadan/Lebaran** yang sangat presisi.
-- **Bawang Merah**: Peak di May (+1.49), trough di Oct (-1.79) — cerminkan siklus panen.
+### Plot 8 — Matriks Korelasi Harga (Daily Returns)
 
-> [!TIP]
-> Pola seasonality ini sangat berharga untuk model prediksi — bulan tertentu secara konsisten lebih mahal/murah.
+![Plot 8 — Matriks Korelasi Harga](../plots/08_correlation_matrix.png)
+
+*   **Finding**: Korelasi harian berbasis returns membuktikan bahwa Beras memiliki hubungan searah yang kuat dengan Gula Pasir ($r \approx 0.45$). Korelasi harga mentah yang bernilai tinggi ($r > 0.85$) terbukti merupakan korelasi semu akibat inflasi makroekonomi umum.
+*   **Insight**: Menggunakan returns memberikan hubungan volatilitas harian riil yang lebih jujur secara statistik, bebas dari pengaruh tren kenaikan inflasi nominal.
+*   **Actionable Insight**: Analisis rambatan harga TPID harus merujuk pada korelasi returns harian ini untuk memperkirakan kecepatan transmisi shock harga dari satu komoditas ke komoditas lainnya.
+
+### Plot 9 — Pola Seasonalitas Bulanan
+
+![Plot 9 — Pola Seasonalitas Bulanan](../plots/09_seasonality.png)
+
+*   **Finding**: Daging Ayam Ras dan Telur Ayam Ras secara konsisten menunjukkan pola seasonal naik tajam di bulan Desember dan turun kembali di bulan Januari-Februari.
+*   **Insight**: Puncak konsumsi akhir tahun (*Nataru*) menciptakan lonjakan permintaan musiman jangka pendek yang berulang secara periodik.
+*   **Actionable Insight**: Dinas Pertanian harus berkoordinasi dengan peternak lokal untuk meningkatkan populasi ayam siap potong dan produksi telur mulai bulan Oktober agar siap panen di bulan Desember.
+
+### Plot 10 — Heatmap Seasonalitas Z-Score
+
+![Plot 10 — Heatmap Seasonalitas Z-Score](../plots/10_zscore_heatmap.png)
+
+*   **Finding**: Peta Z-Score menunjukkan visualisasi merah pekat (harga mahal) di bulan November-Desember untuk hampir seluruh komoditas pangan, kecuali Daging Sapi yang hanya memerah di bulan Maret/April.
+*   **Insight**: Desember adalah bulan inflasi pangan tertinggi di Aceh, sedangkan Daging Sapi tunduk pada kalender keagamaan lokal (*Meugang* Ramadan), bukan kalender Masehi akhir tahun.
+*   **Actionable Insight**: TPID harus membagi kalender Operasi Pasar menjadi dua fokus: Operasi Pasar Umum Akhir Tahun (Desember) dan Operasi Pasar Daging Sapi Spesifik (H-3 Ramadan).
+
+### Plot 11 — Distribusi Return Harian
+
+![Plot 11 — Distribusi Return Harian](../plots/11_daily_returns.png)
+
+*   **Finding**: Return harian Cabai Merah Keriting memiliki nilai standar deviasi ($\sigma$) sebesar 8.06% dengan bentuk distribusi *leptokurtic* dan ekor kanan yang sangat panjang (mencapai +100%).
+*   **Insight**: Terjadi anomali harian di mana harga cabai bisa melonjak hingga dua kali lipat dalam satu hari akibat hambatan transportasi di perbatasan Aceh-Sumut.
+*   **Actionable Insight**: Satgas Pangan harus memastikan kelancaran logistik di jalur lintas darat nasional (jalur Medan-Banda Aceh) untuk mencegah shock pasokan harian yang memicu lonjakan ekstrim.
+
+### Plot 12 — Harga Rata-rata per Kategori & Tahun
+
+![Plot 12 — Harga Rata-rata per Kategori & Tahun](../plots/12_category_prices.png)
+
+*   **Finding**: Bar rata-rata harga tahun 2025/2026 untuk beras, gula, dan protein hewani secara visual lebih panjang secara konsisten dibandingkan tahun 2021/2022.
+*   **Insight**: Terjadi peningkatan pengeluaran nominal rumah tangga yang permanen untuk pemenuhan gizi pokok.
+*   **Actionable Insight**: Pemerintah Daerah harus menyesuaikan standar Upah Minimum Provinsi (UMP) dengan mempertimbangkan pergeseran batas atas biaya belanja pangan pokok ini agar daya beli riil pekerja tidak merosot.
+
+### Plot 13 — Stacked Area Chart: Kontribusi Kategori terhadap Total Harga
+
+![Plot 13 — Stacked Area Chart](../plots/13_stacked_area.png)
+
+*   **Finding**: Total gabangan harga komoditas (di luar Daging Sapi) naik dari kisaran Rp 270.000 di tahun 2021 menjadi lebih dari Rp 350.000 di tahun 2026, dengan fluktuasi area paling dinamis disumbang oleh komoditas Cabai.
+*   **Insight**: Cabai adalah komoditas utama yang menggerakkan volatilitas bulanan belanja pangan masyarakat.
+*   **Actionable Insight**: Menjaga kestabilan harga Cabai adalah kunci utama untuk meredam gejolak inflasi bulanan (*Month-over-Month*) di Provinsi Aceh.
 
 ---
 
-## Plot 11 — Distribusi Return Harian
-![Daily Returns](../plots/11_daily_returns.png)
+## 🏁 4. Ringkasan Rekomendasi Taktis TPID Aceh
 
-### Temuan Utama:
-- **Cabai Merah Keriting**: σ = 8.06% — standar deviasi return harian tertinggi. Distribusi memiliki **ekor kanan yang sangat panjang** (sampai +100%!), menandakan satu hari bisa naik 2x lipat.
-- **Cabai Rawit Hijau**: σ = 5.98%, serupa tapi sedikit lebih rendah. Juga punya fat right tail.
-- **Bawang Merah**: σ = 3.29%, distribusi lebih simetris tapi tetap leptokurtic (puncak tinggi, ekor tebal).
-- **Telur Ayam, Daging Ayam, Bawang Putih**: σ ≈ 1.8–2.1%, jauh lebih rendah. Distribusi lebih terpusat di 0.
-- Semua komoditas memiliki **mean return positif** (0.03–0.26%), menandakan tren inflasi harian yang kecil tapi konsisten.
+Berdasarkan temuan EDA di atas, berikut rencana aksi strategis bagi Tim Pengendalian Inflasi Daerah (TPID) Provinsi Aceh:
 
-> [!WARNING]
-> Fat tails di Cabai Merah/Rawit menandakan risiko harga ekstrem — ini sulit di-predict dengan model distribusi normal.
-
----
-
-## Plot 12 — Harga Rata-rata per Kategori & Tahun
-![Category Prices](../plots/12_category_prices.png)
-
-### Temuan Utama:
-- **Daging Sapi** mendominasi skala harga (~Rp 150K), 3x lipat dari kategori ke-2.
-- **Kenaikan paling visible per tahun**: Beras, Gula Pasir, Daging Ayam — bar hijau (2025) konsisten lebih panjang dari bar pink (2023).
-- **Minyak Goreng & Gula Pasir**: Kategori "termurah", tapi justru minyak goreng curah punya persentase kenaikan tertinggi (+29.5%).
-- **Bawang Merah & Bawang Putih**: Harga absolut serupa (~Rp 35–42K), tapi Bawang Putih lebih stabil antar tahun.
-
----
-
-## Plot 13 — Stacked Area Chart: Kontribusi Kategori terhadap Total Harga
-![Stacked Area](../plots/13_stacked_area.png)
-
-### Temuan Utama:
-- **Total combined price naik ~30%**: dari ~Rp 270K (Jan 2023) ke ~Rp 350K+ (Nov 2025).
-- **Bawang Putih & Bawang Merah** (kuning & hijau di bawah) memberikan kontribusi fluktuasi besar — terlihat dari "gelombang" di area bawah.
-- **Cabai (Merah + Rawit)** adalah **driver utama variabilitas** — area pink/ungu berfluktuasi paling lebar. Peak di Mar 2024 terlihat sangat jelas.
-- **Beras** (biru gelap) menunjukkan jump yang jelas di awal 2024, setelah itu **sustained** di level yang lebih tinggi.
-- **Minyak Goreng** (coklat) naik secara gradual tapi konsisten.
-- Ada pola seasonal berulang — combined price cenderung puncak di Dec/Jan setiap tahun.
-
----
-
-## 🔑 Ringkasan Temuan Kunci
-
-| Insight | Detail |
-|---------|--------|
-| **Komoditas paling inflasioner** | Minyak Goreng Curah (+29.5%), Daging Ayam (+29.3%) |
-| **Komoditas paling volatil** | Cabai Merah Keriting (CV 31%), Cabai Rawit Hijau (CV 19%) |
-| **Komoditas paling stabil** | Daging Sapi (CV 2%), Minyak Goreng Kemasan 1 (CV 2%) |
-| **Efek Ramadan/Lebaran** | Daging Sapi naik tajam HANYA di bulan Maret (Z = +2.82) |
-| **Efek Natal/Tahun Baru** | Telur Ayam & Daging Ayam peak di Desember |
-| **Regime change** | Beras mengalami jump harga di awal 2024 dan tidak kembali |
-| **Korelasi terkuat** | Semua varian Beras (r > 0.96); Gula Premium & Lokal (r = 0.94) |
-| **Anomali 2025** | Cabai Merah Keriting melonjak ke >Rp 140K di Q4 — rekor tertinggi |
-
-> [!NOTE]
-> Semua plot disimpan di folder `/plots/` sebagai file PNG resolusi tinggi (150 DPI).
+| Prioritas | Komoditas | Masalah Utama | Rekomendasi Tindakan Nyata (Actionable) |
+| :---: | :--- | :--- | :--- |
+| **1** | **Cabai (Merah & Rawit)** | Volatilitas ekstrim harian (Daily Return $\sigma = 8.06\%$) akibat cuaca dan logistik. | Fasilitasi Ongkos Angkut (FOA) di jalur perbatasan darat dan pemanfaatan *Controlled Atmosphere Storage* (CAS) untuk memperpanjang umur simpan cabai. |
+| **2** | **Beras (Semua Kualitas)** | Pergeseran tingkat harga permanen (+20.9% YoY) sejak awal 2024. | Penyesuaian baseline target inflasi daerah, optimalisasi penyerapan gabah lokal oleh Bulog, dan penguatan bantuan pangan. |
+| **3** | **Daging Sapi (Kualitas 1 & 2)** | Lonjakan harga ekstrem spesifik hari raya (Meugang, Maret/April). | Uji Mann-Whitney U membuktikan harga signifikan tinggi ($p < 0.001$). Sediakan kuota daging sapi beku murah impor oleh Bulog sebulan sebelum hari raya sebagai alternatif pasokan. |
+| **4** | **Protein Unggas (Daging & Telur)** | Pola musiman akhir tahun yang konsisten (Desember). | Kruskal-Wallis membuktikan efek bulanan yang nyata ($p < 0.001$). Koordinasikan peningkatan populasi ternak ayam 3 bulan sebelum Desember dan operasi pasar murah di minggu ke-2 Desember. |

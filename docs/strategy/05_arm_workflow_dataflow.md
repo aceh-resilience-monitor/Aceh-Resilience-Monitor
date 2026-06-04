@@ -20,7 +20,7 @@ graph TB
 
     subgraph "☁️ AZURE CLOUD PLATFORM"
         subgraph "⚡ Compute"
-            C["Azure Functions\nDaily Pipeline\n(Timer: 08:00 WIB)"]
+            C["Azure Functions\nDaily Pipeline\n(Timer: 08:00 & 14:00 WIB)"]
         end
         subgraph "🧠 AI / ML"
             D["Azure Machine Learning\nMLflow Experiment Tracking\nModel Registry"]
@@ -49,7 +49,7 @@ graph TB
     E -->|"Training data (multi-dim)"| D
     D -->|"Model + predictions"| E
     C -->|"Generate JSON"| E
-    E -->|"dashboard_data.json"| F
+    E -->|"dashboard_data.json (~1.2 MB)"| F
     F --> G
     C -->|"If anomaly / EWS spike"| H
 ```
@@ -85,7 +85,7 @@ flowchart LR
     end
 
     subgraph "LAYER 5: Output"
-        E1["dashboard_data.json\n→ Azure Blob Storage"]
+        E1["dashboard_data.json (~1.2 MB)\n→ Azure Blob Storage"]
         E2["MLflow Metrics\n→ Azure ML Studio"]
         E3["Telegram Alert\n→ Satgas Pangan (Z-Score + EWS)"]
     end
@@ -122,22 +122,22 @@ flowchart TD
     
     subgraph "MLflow Experiment: arm-prophet-forecasting"
         D1["Run 1: Beras Bawah I (Banda Aceh)\nParams: yearly_seasonality=True\nMetrics: MAPE=1.39%"]
-        D2["Run 2: Cabai Merah (Aggregated)\nParams: yearly_seasonality=True\nMetrics: MAPE=29.54%"]
+        D2["Run 2: Cabai Merah (Aggregated)\nParams: yearly_seasonality=True\nMetrics: MAPE=29.81%"]
         D3["...\n(84 runs total: 21 items × 4 regions)"]
     end
 
     E["📊 Baseline Comparison"]
     
     subgraph "Perbandingan Model"
-        F1["Naive Forecast → MAPE ~15%"]
-        F2["SMA-30 → MAPE ~12%"]
-        F3["Prophet → MAPE 7.74% ✅"]
+        F1["Naive Forecast → MAPE ~10.0%"]
+        F2["SMA-30 → MAPE ~9.5%"]
+        F3["Prophet → MAPE ~12.4% ✅"]
         F4["AutoML (15+ models) → compare"]
     end
 
-    G["🏆 Model Selection\nProphet dipilih:\n- MAPE terendah\n- Interpretable\n- Handle seasonality"]
+    G["🏆 Model Selection\nProphet dipilih:\n- Deteksi Volatilitas Musiman\n- Interpretable\n- Handle Holiday (Meugang)"]
 
-    H["💾 Model Registry\nAzure ML Model Store\n84 model artifacts (.pkl)"]
+    H["💾 Model Registry\nAzure ML Model Store\n84 model artifacts (model.json)"]
 
     A --> B --> C
     C --> D1
@@ -157,7 +157,7 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-    A["⏰ Timer Trigger\nSetiap hari 08:00 WIB"]
+    A["⏰ Timer Trigger\nTwice Daily: 08:00 & 14:00 WIB\n(Cron: 0 0 1,7 * * *)"]
     
     B["🌐 Step 1: Scrape PIHPS\nFetch harga harian\ndari bi.go.id"]
     
@@ -243,6 +243,8 @@ graph LR
         S5["train_with_mlflow.py\n(MLflow logging)"]
         S6["prepare_dashboard_data.py\n(orchestrator)"]
         S7["save_plots.py\n(EDA visualizations)"]
+        S8["scraper.py\n(daily scraper)"]
+        S9["telegram_alert.py\n(Telegram notification)"]
     end
 
     subgraph "azure-functions/"
@@ -257,14 +259,15 @@ graph LR
         D1["index.html"]
         D2["app.js"]
         D3["style.css"]
-        D4["dashboard_data.json"]
+        D4["dashboard_data.json\n(~1.2 MB)"]
     end
 
     subgraph "tests/"
         T1["test_etl.py"]
         T2["test_anomaly.py"]
-        T3["test_forecast.py"]
+        T3["test_scraper.py"]
         T4["test_config.py"]
+        T5["test_telegram_alert.py"]
     end
 
     subgraph "docs/"
@@ -272,6 +275,13 @@ graph LR
         DOC2["azure_architecture.md\n(skalabilitas)"]
         DOC3["data_dictionary.md"]
         DOC4["learning_guide.md\n(MLOps & git conflict)"]
+        subgraph "docs/strategy/"
+            STR1["01_arm_audit_report.md"]
+            STR2["02_arm_roasting_report.md"]
+            STR3["03_arm_battle_plan.md"]
+            STR4["04_azure_implementation_guide.md"]
+            STR5["05_arm_workflow_dataflow.md"]
+        end
     end
 
     subgraph "root/"
@@ -307,8 +317,9 @@ graph LR
     NB -.->|"imports"| S3
     T1 -.->|"tests"| S2
     T2 -.->|"tests"| S3
-    T3 -.->|"tests"| S4
+    T3 -.->|"tests"| S8
     T4 -.->|"tests"| S1
+    T5 -.->|"tests"| S9
 ```
 
 ---

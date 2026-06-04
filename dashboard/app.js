@@ -149,15 +149,22 @@ function delay(ms) {
 // ── Load Data ────────────────────────────────────────────────────
 async function loadData() {
   try {
-    // 1. Try fetching from Azure Blob Storage (Data Lake)
-    const blobUrl = 'https://armmlworkspace7422048783.z23.web.core.windows.net/dashboard_data.json';
+    // 1. Try fetching from local file if running on localhost, otherwise from Azure Blob Storage (Data Lake)
+    const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+    const blobUrl = isLocal 
+      ? './dashboard_data.json' 
+      : 'https://armmlworkspace7422048783.z23.web.core.windows.net/dashboard_data.json';
+      
     const resp = await fetch(blobUrl);
     if (resp.ok) {
       DATA = await resp.json();
-      console.log("Data loaded successfully from Azure Blob Storage (Data Lake)!");
+      console.log(isLocal 
+        ? "Data loaded successfully from local dashboard_data.json!" 
+        : "Data loaded successfully from Azure Blob Storage (Data Lake)!"
+      );
       return true;
     } else {
-      throw new Error(`Blob fetch failed with status: ${resp.status}`);
+      throw new Error(`Fetch failed with status: ${resp.status}`);
     }
   } catch (e) {
     console.warn('Azure Blob Storage fetch failed (likely CORS not configured). Falling back to local data.', e);

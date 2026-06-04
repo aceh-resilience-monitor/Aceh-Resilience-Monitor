@@ -50,14 +50,14 @@ Berikut adalah daftar modul kode utama pada proyek ARM, blok fungsi krusial di d
 *   **Fungsi Kunci:**
     *   `mlflow.set_tracking_uri(ws.get_mlflow_tracking_uri())`: Mengarahkan log lokal menuju server Azure ML Workspace.
     *   `mlflow.log_param()`, `mlflow.log_metric()`: Mencatat parameter tuning dan hasil metrik akurasi (MAPE, MAE, RMSE) ke server.
-    *   `mlflow.prophet.log_model()`: Mengunggah file model biner `.pkl` ke dalam Model Registry Azure ML.
+    *   `mlflow.log_artifact()`: Mengunggah file model hasil serialisasi JSON (`model.json`) sebagai artefak ke cloud, memitigasi masalah kompatibilitas API Azure ML.
 *   **Output Utama:** Sesi eksperimen visual yang dapat diakses di portal `ml.azure.com`.
 
 ### F. Pelaksana Pipeline Harian (`azure-functions/function_app.py`)
-*   **Fungsi Utama:** Robot serverless harian yang berjalan otomatis pukul 08:00 WIB untuk mengeksekusi seluruh rangkaian di cloud.
+*   **Fungsi Utama:** Robot serverless harian yang berjalan otomatis dua kali sehari pukul **08:00 & 14:00 WIB** (cron `0 0 1,7 * * *`) untuk mengeksekusi seluruh rangkaian di cloud.
 *   **Fungsi Kunci:**
     *   `scrape_daily_pihps()`: Melakukan request HTTP GET ke endpoint Bank Indonesia untuk mengambil harga teranyar.
-    *   `daily_pipeline(myTimer)`: Fungsi trigger utama yang menjalankan semua alur, menyusun pesan notifikasi premium, mengirimkannya ke grup Telegram Satgas Pangan, dan memperbarui visualisasi dasbor.
+    *   `arm_daily_pipeline(timer)`: Fungsi trigger utama yang menjalankan semua alur, menyusun pesan notifikasi premium, mengirimkannya ke grup Telegram Satgas Pangan, dan memperbarui visualisasi dasbor.
 *   **Output Utama:** Notifikasi Telegram Bot aktif, visualisasi dasbor ter-refresh harian di Azure Static Web Apps.
 
 ---
@@ -98,7 +98,7 @@ Untuk memverifikasi keandalan logika kode, kecocokan tipe data, dan integritas k
 ```bash
 pytest
 ```
-*   **Output Sukses:** Menampilkan laporan kelulusan pengujian berwarna hijau: `================ 71 passed in X.XXs ================`.
+*   **Output Sukses:** Menampilkan laporan kelulusan pengujian berwarna hijau: `================ 74 passed in X.XXs ================`.
 
 ### E. Menjalankan Pelatihan MLOps dengan Logging ke Azure ML Studio
 Untuk mengirim log parameter, metrik evaluasi MAPE, dan meregistrasikan model Prophet ke cloud Azure ML:
@@ -118,7 +118,7 @@ func start
 ```
 *   **Cara Trigger Manual Secara Lokal:** Buka terminal baru, jalankan perintah `curl` berikut untuk memicu jalannya pipeline tanpa menunggu waktu timer:
     ```bash
-    curl -post http://localhost:7071/admin/functions/daily_pipeline
+    curl -post http://localhost:7071/admin/functions/arm_daily_pipeline
     ```
 
 ---
@@ -168,7 +168,7 @@ Untuk mengetes jalannya pipeline harian di cloud saat itu juga tanpa menunggu ja
 az functionapp function trigger \
   --name arm-daily-pipeline-74220 \
   --resource-group arm-datathon-rg \
-  --function-name daily_pipeline
+  --function-name arm_daily_pipeline
 ```
 *   *Ini akan langsung mengeksekusi pipeline di cloud, menyemburkan pesan alert ke Telegram grup Anda, dan memperbarui grafik dasbor.*
 

@@ -85,7 +85,7 @@ class TestScraperOrchestration:
     @patch("scripts.scraper.fetch_data_from_api")
     def test_scrape_daily_pihps_today_has_data(self, mock_fetch, mock_sleep):
         # Setup mock fetch to return mock API data for 2026-06-02
-        # There are 3 regions * 4 sources = 12 total calls to fetch_data_from_api
+        # There are 3 dates in lookback window * 3 regions * 4 sources = 36 total calls to fetch_data_from_api
         mock_api_data = [
             {"no": "2", "name": "Beras Kualitas Bawah I", "level": 2, "02/06/2026": "13,600"}
         ]
@@ -94,23 +94,24 @@ class TestScraperOrchestration:
         # Run scraping with empty existing list
         new_records = scrape_daily_pihps([], run_date="2026-06-02")
         
-        # Should have fetched and returned elements (12 * 1 = 12 processed elements)
-        assert len(new_records) == 12
-        assert mock_fetch.call_count == 12
+        # Should have fetched and returned elements (36 processed elements)
+        assert len(new_records) == 36
+        assert mock_fetch.call_count == 36
         
-        # Verify deduplication
-        existing_records = [new_records[0]]
-        # Running again with existing records should yield 11 new records (one deduplicated)
+        # Verify overwrite logic: existing records of successfully scraped dates are removed in-place
+        existing_records = [{"tanggal": "2026-06-02", "name": "Old Rice", "level": 2}]
         with patch("scripts.scraper.fetch_data_from_api") as mock_fetch_again:
             mock_fetch_again.return_value = mock_api_data
             new_records_again = scrape_daily_pihps(existing_records, run_date="2026-06-02")
-            assert len(new_records_again) == 11
+            assert len(new_records_again) == 36
+            # Date '2026-06-02' was successfully scraped, so existing list should have been cleared of it
+            assert len(existing_records) == 0
 
     @patch("scripts.scraper.time.sleep")
     @patch("scripts.scraper.fetch_data_from_api")
     def test_scrape_daily_pihps_lookback_trigger(self, mock_fetch, mock_sleep):
         # Let's say today (2026-06-02) has no data
-        # Let's mock: today returns [], yesterday (2026-06-01) returns data, others return []
+        # Let's mock: today returns [], yesterday (2026-06-01) returns data, day before (2026-05-31) returns []
         def side_effect(date_str, regency_id, price_type_id):
             if date_str == "2026-06-01":
                 return [{"no": "2", "name": "Beras Kualitas Bawah I", "level": 2, "01/06/2026": "13,600"}]
@@ -120,24 +121,12 @@ class TestScraperOrchestration:
         
         new_records = scrape_daily_pihps([], run_date="2026-06-02")
         
-        # Fetch should be called for 2026-06-02 (today) first (12 calls).
-        # Since it returns empty, lookback should search days back.
-        # 2026-06-01 (yesterday) will return data, and lookback should stop after that.
-        # Wait, the lookback logic checks day 1, then day 2, ... up to 7.
-        # But wait! In daily_update.js:
-        # If totalNewEntries has entries after checking yesterday, does it continue checking 2-7?
-        # Yes, daily_update.js checks all 7 days back in a loop if today has no data!
-        # Let's verify:
-        # "If today is empty, check 7 days back...
-        # for (let i = 1; i <= 7; i++) {
-        #     const pastEntries = await processDate(pastDateStr, existingDataMap);
-        #     if (pastEntries.length > 0) { totalNewEntries = totalNewEntries.concat(pastEntries); }
-        # }"
-        # Yes, it loops through all 7 days and concatenates!
-        # So it checks 2026-06-02 (12 calls), then 2026-06-01 (12 calls), then 2026-05-31 (12 calls), etc.
-        # Let's verify the call counts
-        # 12 calls for today, plus 12 * 7 = 84 calls for the 7 lookback days. Total calls = 96 calls.
-        assert mock_fetch.call_count == 96
+        # In python implementation, lookback always checks 3 days:
+        # Today (2026-06-02) -> 12 calls
+        # Yesterday (2026-06-01) -> 12 calls
+        # Day before (2026-05-31) -> 12 calls
+        # Total = 36 calls
+        assert mock_fetch.call_count == 36
         # And we should have 12 records from 2026-06-01
         assert len(new_records) == 12
         assert all(r["tanggal"] == "2026-06-01" for r in new_records)
