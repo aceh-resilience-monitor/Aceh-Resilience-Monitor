@@ -342,6 +342,21 @@ Repositori ini memiliki **74 unit tests otomatis** yang mencakup pengujian fungs
 *   *Risiko Server down pada Sumber Data:* Azure Functions dilengkapi penanganan pengecualian (*error handling*) yang otomatis menggunakan data harga hari sebelumnya jika scraper gagal memuat data baru.
 *   *Risiko Overfitting pada Komoditas Volatil:* Menetapkan model ARM murni sebagai *decision support* (human-in-the-loop), bukan eksekutor otomatis.
 
+### Laporan Dokumentasi & Analisis Pendukung (Tersedia di Repositori)
+Sebagai penunjang teknis untuk juri, seluruh kode eksperimen dan dokumen analisis mendalam tersedia lengkap di repositori:
+
+**1. Notebooks Eksperimen & Analisis (Format `.ipynb`):**
+*   **`notebooks/eda.ipynb`**: Kode lengkap Exploratory Data Analysis, visualisasi tren harga historis, dan analisis korelasi antar-komoditas pangan.
+*   **`notebooks/evaluate_prophet.ipynb`**: Kode eksperimen pemodelan Prophet, tuning parameter, dan pengujian model time-series.
+*   **`notebooks/analysis_walkthrough.ipynb`**: Panduan end-to-end (walkthrough) alur data dari ETL, pemodelan, hingga output serving dashboard.
+
+**2. Dokumen Analisis & Panduan Teknis (Format `.md`):**
+*   **`docs/eda_interpretation.md`**: Interpretasi bisnis hasil EDA, analisis lonjakan harga musiman (Meugang & Ramadan), serta temuan anomali harga pangan di Aceh.
+*   **`evaluation_prophet.md`**: Laporan evaluasi performa model Prophet harian, perbandingan metrik kesalahan (MAPE, MAE, RMSE), dan analisis error model.
+*   **`docs/azure_architecture.md`**: Dokumentasi arsitektur cloud Azure, konfigurasi Managed Identity passwordless, serta integrasi tracking MLflow.
+*   **`docs/data_dictionary.md`**: Kamus data terstruktur yang mendefinisikan skema data mentah (JSON) PIHPS, data serving dashboard, dan skema logging metrik.
+*   **`docs/fabric_recommendation.md`**: Analisis kajian migrasi arsitektur data masa depan ke Microsoft Fabric untuk skalabilitas skala provinsi.
+
 ---
 
 ## Link Aplikasi/Project
