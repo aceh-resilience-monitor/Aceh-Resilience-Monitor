@@ -52,7 +52,7 @@ Komoditas ini sangat direkomendasikan untuk dijadikan rujukan kebijakan operasi 
 | **Beras Kualitas Medium I** | Sangat Stabil | **4.86%** | ± Rp 714 / Kg | Rp 792 |
 
 *Berikut adalah plot hasil backtesting Aktual vs Prediksi Daging Sapi Kualitas 1 (Keandalan Sangat Tinggi):*
-![Evaluasi Daging Sapi Kualitas 1](plots/evaluation/daging_sapi_kualitas_1.png)
+![Evaluasi Daging Sapi Kualitas 1](../plots/evaluation/daging_sapi_kualitas_1.png)
 
 ### 🟡 2. Keandalan Sedang (Error 5% - 15%)
 Komoditas dengan sedikit fluktuasi. Prediksi dapat digunakan untuk menangkap tren jangka menengah (1-2 minggu ke depan).
@@ -65,7 +65,7 @@ Komoditas dengan sedikit fluktuasi. Prediksi dapat digunakan untuk menangkap tre
 > *Insight Teknikal:* Pada **Telur Ayam Ras**, rasio RMSE/MAE cukup besar (Rp 3.178 berbanding Rp 2.420). Hal ini mengindikasikan adanya beberapa kejadian di 90 hari terakhir (seperti liburan lokal) di mana harga nyata melonjak tinggi, tetapi model gagal memprediksi lonjakan tersebut secara akurat.
 
 *Berikut adalah plot hasil backtesting Aktual vs Prediksi Telur Ayam Ras Segar (Keandalan Sedang):*
-![Evaluasi Telur Ayam Ras Segar](plots/evaluation/telur_ayam_ras_segar.png)
+![Evaluasi Telur Ayam Ras Segar](../plots/evaluation/telur_ayam_ras_segar.png)
 
 ### 🔴 3. Sulit Diprediksi secara Univariat (Error > 15%)
 Kelompok komoditas hortikultura yang **tidak direkomendasikan** untuk menggunakan prediksi *time-series* murni pada pelacakan harga strategis saat ini.
@@ -80,7 +80,7 @@ Kelompok komoditas hortikultura yang **tidak direkomendasikan** untuk menggunaka
 | **Cabai Rawit Merah** | Sangat Volatile | **63.08%** | ± Rp 16056 / Kg | Rp 16863 |
 
 *Berikut adalah plot hasil backtesting Aktual vs Prediksi Cabai Merah Keriting (Hortikultura Volatil/Sulit Diprediksi):*
-![Evaluasi Cabai Merah Keriting](plots/evaluation/cabai_merah_keriting.png)
+![Evaluasi Cabai Merah Keriting](../plots/evaluation/cabai_merah_keriting.png)
 
 ---
 
