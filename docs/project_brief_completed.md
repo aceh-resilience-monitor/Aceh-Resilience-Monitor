@@ -8,7 +8,7 @@
 | :---: | :--- | :--- | :--- |
 | 1 | **Aulia Muzhaffar** | auliamuzhaffar@gmail.com | *Machine Learning & Azure Specialist* (Logika *Forecasting* Prophet, Evaluasi Holdout, Azure ML & MLflow, Azure Functions Serverless Pipeline, Bug Fixing `NaN` ke `null`). |
 | 2 | **Muhammad Ilhaam Ghiffari** | ilhaamghiffari@gmail.com | *Data Engineer & Frontend Developer* (Modular Refactoring ETL, Z-Score Anomaly Detection, Dasbor Dark Glassmorphism, Kompresi Payload JSON, CORS Configuration). |
-| 3 | **Arief Hidayah** | ariefhidayahm@gmail.com | *QA Auditor, Repo Manager & Storyteller* (Scraping Data PIHPS, Unit Testing Pytest, Laporan Arsitektur Cloud & Error Analysis, Q&A Drill, Alert Telegram Bot). |
+| 3 | **Muhammad Arief Hidayah** | ariefhidayahm@gmail.com | *QA Auditor, Repo Manager & Storyteller* (Scraping Data PIHPS, Unit Testing Pytest, Laporan Arsitektur Cloud & Error Analysis, Q&A Drill, Alert Telegram Bot). |
 
 **Topik Proyek:** Ketahanan Pangan & Agrikultur Modern  
 **Status Produk:** 🚀 **100% Selesai & Terverifikasi Cloud**  
@@ -360,7 +360,7 @@ Untuk memperdalam pemahaman juri dan *stakeholders* terhadap proyek **Aceh Resil
 ### 👥 2. Tim dan Peran Masing-Masing Anggota
 *   **Aulia Muzhaffar** (*Machine Learning & Azure Specialist*): Bertanggung jawab atas perancangan model forecasting Prophet, integrasi MLOps di Azure ML Studio, pembuatan ETL serverless di Azure Functions, serta bug fixing sanitasi JSON.
 *   **Muhammad Ilhaam Ghiffari** (*Data Engineer & Frontend Developer*): Merancang dashboard interaktif dark glassmorphism, mengompresi payload data historis, mengintegrasikan peta spasial Leaflet.js, serta mengkonfigurasi kebijakan CORS Azure Blob Storage.
-*   **Arief Hidayah** (*QA Auditor & Storyteller*): Mengelola repositori GitHub, menyusun dokumentasi pengujian unit testing (Pytest), membuat alert otomatis pada Telegram Bot, dan merancang laporan interpretasi data.
+*   **Muhammad Arief Hidayah** (*QA Auditor & Storyteller*): Mengelola repositori GitHub, menyusun dokumentasi pengujian unit testing (Pytest), membuat alert otomatis pada Telegram Bot, dan merancang laporan interpretasi data.
 
 *(Rincian lengkap atribusi kode dapat dilihat pada tabel informasi tim di bagian atas dokumen ini).*
 

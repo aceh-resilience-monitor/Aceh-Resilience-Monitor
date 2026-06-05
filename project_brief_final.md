@@ -9,7 +9,7 @@
 | :---: | :--- | :--- | :--- |
 | 1 | **Aulia Muzhaffar** | auliamuzhaffar@gmail.com | *Machine Learning & Azure Specialist* (Logika *Forecasting* Prophet, Evaluasi Holdout, Azure ML & MLflow, Azure Functions Serverless Pipeline, Bug Fixing `NaN` ke `null`, Implemen Uji Hipotesis, dan Storytelling Notebook). |
 | 2 | **Muhammad Ilhaam Ghiffari** | ilhaamghiffari@gmail.com | *Data Engineer & Frontend Developer* (Modular Refactoring ETL, Z-Score Anomaly Detection, Dasbor Dark Glassmorphism, Kompresi Payload JSON, CORS Configuration, Security Environment Localizer). |
-| 3 | **Arief Hidayah** | ariefhidayahm@gmail.com | *QA Auditor, Repo Manager & Storyteller* (Scraping Data PIHPS, Unit Testing Pytest, Laporan Arsitektur Cloud & Error Analysis, Q&A Drill, Alert Telegram Bot). |
+| 3 | **Muhammad Arief Hidayah** | ariefhidayahm@gmail.com | *QA Auditor, Repo Manager & Storyteller* (Scraping Data PIHPS, Unit Testing Pytest, Laporan Arsitektur Cloud & Error Analysis, Q&A Drill, Alert Telegram Bot). |
 
 *   **Topik Proyek:** Ketahanan Pangan & Agrikultur Modern (Kategori: Urban Resilience & Smart City)
 
@@ -332,7 +332,7 @@ Arsitektur ARM dirancang modular. Jika wilayah pemantauan diperluas ke tingkat n
 ### Tim dan Peran Masing-Masing Anggota
 *   **Aulia Muzhaffar (ML & Azure Specialist):** Mengembangkan model Prophet, evaluasi baseline holdout, setup eksperimen MLflow, mendesain serverless pipeline Azure Functions, mengimplementasikan pengujian hipotesis statistik, serta menyusun storytelling analisis.
 *   **Muhammad Ilhaam Ghiffari (Data Engineer & Frontend Developer):** Melakukan refactoring modular script ETL, mengembangkan modul deteksi anomali Z-score, mendesain visualisasi dark glassmorphism dashboard, merancang kompresi data JSON, dan mengamankan environment lokal.
-*   **Arief Hidayah (QA Auditor, Repo Manager & Storyteller):** Membuat scraper data harian PIHPS, menulis suite pengujian otomatis pytest (74 test cases), menganalisis error model, menyusun bot integrasi notifikasi Telegram, dan mengelola sinkronisasi repositori.
+*   **Muhammad Arief Hidayah (QA Auditor, Repo Manager & Storyteller):** Membuat scraper data harian PIHPS, menulis suite pengujian otomatis pytest (74 test cases), menganalisis error model, menyusun bot integrasi notifikasi Telegram, dan mengelola sinkronisasi repositori.
 
 ### Kualitas Kode & Penjaminan Mutu (QA)
 Repositori ini memiliki **74 unit tests otomatis** yang mencakup pengujian fungsional dari modul ETL, kalkulasi statistik Z-score, peramalan Prophet, sanitasi JSON, scraper web, notifikasi Telegram, dan evaluasi model baseline. Pengujian dijalankan otomatis via pytest.
