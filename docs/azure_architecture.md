@@ -125,7 +125,7 @@ flowchart TB
 | Azure ML + MLflow | Free tier (workspace) | **$0** | Experiment tracking gratis. Compute hanya jika training di cloud (ARM train di RAM Functions). |
 | **TOTAL** | | **$0/bulan** | Semua berjalan di dalam free tier |
 
-> **Golden Statement untuk Juri:**
+> **Golden Statement :**
 > *"Seluruh infrastruktur cloud ARM berjalan di Azure Free Tier dengan total biaya $0 per bulan, membuktikan bahwa sistem monitoring pangan cerdas bisa diakses oleh pemerintah daerah mana pun tanpa hambatan biaya."*
 
 ---
@@ -167,5 +167,5 @@ Untuk menghemat waktu komputasi dan mencegah timeout pada serverless consumption
 | 34 provinsi | 714 | ~5-8 menit | Premium ($0-20/bulan) |
 | Nasional granular | 5000+ | ~30 menit | Dedicated ($50+/bulan) |
 
-> **Golden Statement untuk Juri:**
+> **Golden Statement :**
 > *"Arsitektur ARM bersifat modular. Untuk ekspansi ke 34 provinsi, cukup tambahkan data source per provinsi di Azure Functions. PIHPS Bank Indonesia sudah mencakup seluruh Indonesia. Cost per provinsi tambahan: ~$0 (masih di free tier)."*
