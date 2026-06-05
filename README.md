@@ -324,7 +324,7 @@ make serve
 
 ```
 datathon-dicoding/
-├── Data/                               # Dataset mentah PIHPS (Excel)
+├── data/                               # Dataset mentah PIHPS (Excel)
 ├── azure-functions/                    # Pipeline ETL & ML Serverless (Azure Functions Python)
 │   ├── function_app.py                 # Endpoint pemicu pipeline harian
 │   ├── requirements.txt                # Dependensi serverless
@@ -341,6 +341,10 @@ datathon-dicoding/
 │   ├── style.css                       # Desain bertema Dark Glassmorphism
 │   ├── dashboard_data.json             # Data visualisasi terkompresi
 │   └── staticwebapp.config.json        # Konfigurasi SWA & aturan CORS
+├── notebooks/                          # Notebooks Eksperimen & Analisis (Format .ipynb)
+│   ├── eda.ipynb                       # Notebook Exploratory Data Analysis (storytelling)
+│   ├── evaluate_prophet.ipynb          # Notebook evaluasi visual model Prophet
+│   └── analysis_walkthrough.ipynb      # Notebook End-to-End Walkthrough Analisis
 ├── scripts/                            # Skrip pembantu & pemrosesan lokal
 │   ├── etl.py                          # Modul ETL lokal
 │   ├── config.py                       # Kamus kategori & nama komoditas
@@ -351,9 +355,7 @@ datathon-dicoding/
 │   ├── train_with_mlflow.py        # Log eksperimen MLOps lokal
 │   ├── save_plots.py                   # Pembuat berkas visualisasi plot EDA
 │   ├── evaluate_baseline.py            # Skrip evaluasi model benchmark
-│   ├── prepare_dashboard_data.py       # Orchestrator lokal pembangun JSON dasbor
-│   ├── eda.ipynb                       # Notebook Exploratory Data Analysis (storytelling)
-│   └── evaluate_prophet.ipynb          # Notebook evaluasi visual model Prophet
+│   └── prepare_dashboard_data.py       # Orchestrator lokal pembangun JSON dasbor
 ├── tests/                              # Berkas unit tests (pytest)
 │   ├── conftest.py                     # Konfigurasi fixtures pengujian
 │   ├── test_etl.py                     # Pengujian in-memory ETL
@@ -364,19 +366,22 @@ datathon-dicoding/
 │   ├── test_telegram_alert.py          # Pengujian perumusan pesan alert
 │   └── test_baseline.py                # Pengujian pembanding model benchmark
 ├── docs/                               # Dokumentasi analisis pendukung
-│   ├── eda_interpretation.md           # Laporan interpretasi visualisasi EDA
+│   ├── project_brief_final.md          # Project Brief Final (Dokumen Utama)
+│   ├── data_analysis.md                # Profiling struktur Excel & data quality
 │   ├── data_dictionary.md              # Kamus data JSON payload dasbor
+│   ├── eda_interpretation.md           # Laporan interpretasi visualisasi EDA
+│   ├── evaluate_prophet.md             # Laporan evaluasi performa model Prophet
+│   ├── 05_arm_workflow_dataflow.md     # Diagram dataflow & relasi file
 │   ├── azure_architecture.md           # Laporan arsitektur awan Microsoft Azure
+│   ├── 01_arm_audit_report.md          # Laporan kepatuhan QA kurikulum
+│   ├── learning_guide.md               # Panduan teori & kearifan lokal Meugang
+│   ├── fabric_recommendation.md        # Laporan kajian migrasi ke Microsoft Fabric
 │   └── strategy/                       # Laporan strategi taktis tim
-│       ├── 01_arm_audit_report.md      # Laporan kepatuhan QA kurikulum
 │       ├── 02_arm_roasting_report.md   # Justifikasi arsitektur & defense ML
 │       ├── 03_arm_battle_plan.md       # Target eksekusi timeline tim
 │       ├── 04_azure_implementation_guide.md # Pemasangan fungsi serverless
-│       ├── 05_arm_workflow_dataflow.md # Diagram dataflow & relasi file
 │       ├── 06_arm_final_implementation_plan.md # Evaluasi akhir submission
 │       └── 07_arm_architecture_blueprint.md # Arsitektur serverless Azure
-├── evaluation_prophet.md               # Laporan evaluasi model Prophet
-├── project_brief_final.md              # Project Brief submission
 ├── requirements.txt                    # Dependensi Python lokal
 ├── Makefile                            # Automator CLI pintas lokal
 ├── .env                                # Konfigurasi rahasia lokal (ignore git)
@@ -397,14 +402,26 @@ datathon-dicoding/
 
 ## 📚 Dokumentasi Lengkap
 
+### **1. Notebooks Eksperimen & Analisis (Format `.ipynb`):**
 | Dokumen | Deskripsi |
 |---------|-----------|
-| [project_brief_final.md](project_brief_final.md) | **Project Brief Final** — Ringkasan eksekutif, fitur, teknologi, dan cara penggunaan |
-| [evaluation_prophet.md](evaluation_prophet.md) | **Laporan Evaluasi Model AI** — Backtesting, metrik MAE/RMSE/MAPE untuk 18 komoditas |
-| [docs/eda_interpretation.md](docs/eda_interpretation.md) | **Interpretasi Insight EDA** — Analisis tren, pola musiman, dan temuan anomali |
-| [docs/data_analysis.md](docs/data_analysis.md) | **Analisis Kualitas Data** — Profiling struktur Excel, missing values, format cleaning |
-| [scripts/eda.ipynb](scripts/eda.ipynb) | **Notebook EDA** — Eksplorasi data interaktif, visualisasi distribusi & tren harga komoditas |
-| [scripts/evaluate_prophet.ipynb](scripts/evaluate_prophet.ipynb) | **Notebook Evaluasi Prophet** — Kode backtesting interaktif dengan visualisasi per komoditas |
+| [notebooks/eda.ipynb](notebooks/eda.ipynb) | **Notebook EDA** — Eksplorasi data interaktif, visualisasi distribusi & tren harga komoditas pangan |
+| [notebooks/evaluate_prophet.ipynb](notebooks/evaluate_prophet.ipynb) | **Notebook Evaluasi Prophet** — Kode eksperimen pemodelan Prophet, tuning parameter, dan backtesting |
+| [notebooks/analysis_walkthrough.ipynb](notebooks/analysis_walkthrough.ipynb) | **Notebook Walkthrough** — Panduan end-to-end alur ETL, pemodelan, hingga output serving dasbor |
+
+### **2. Dokumen Analisis & Panduan Teknis (Format `.md`):**
+| Dokumen | Deskripsi |
+|---------|-----------|
+| [docs/project_brief_final.md](docs/project_brief_final.md) | **Project Brief Final** — Dokumen Utama: Ringkasan eksekutif, fitur, teknologi, dan panduan penggunaan |
+| [docs/data_dictionary.md](docs/data_dictionary.md) | **Kamus Data** — Skema data mentah JSON PIHPS, data serving dashboard, dan metrik logging |
+| [docs/eda_interpretation.md](docs/eda_interpretation.md) | **Interpretasi Insight EDA** — Analisis tren, pola musiman (Meugang & Ramadan), dan temuan anomali |
+| [docs/evaluate_prophet.md](docs/evaluate_prophet.md) | **Laporan Evaluasi Model AI** — Hasil backtesting, perbandingan baseline, dan analisis error model |
+| [docs/05_arm_workflow_dataflow.md](docs/05_arm_workflow_dataflow.md) | **Dataflow & Workflow** — Diagram alur data harian, arsitektur MLOps, dan otomasi bot Telegram |
+| [docs/azure_architecture.md](docs/azure_architecture.md) | **Arsitektur Cloud Azure** — Laporan integrasi Azure Services, security MSI, CORS, dan biaya $0/bulan |
+| [docs/01_arm_audit_report.md](docs/01_arm_audit_report.md) | **Laporan Audit Repositori** — Hasil audit QA repositori berdasarkan kurikulum AI Impact Challenge |
+| [docs/fabric_recommendation.md](docs/fabric_recommendation.md) | **Rekomendasi Microsoft Fabric** — Kajian migrasi arsitektur data masa depan untuk skala provinsi |
+| [docs/learning_guide.md](docs/learning_guide.md) | **Learning Guide** — Panduan teori matematika Prophet dan kearifan lokal Meugang |
+| [docs/data_analysis.md](docs/data_analysis.md) | **Analisis Kualitas Data** — Profiling struktur Excel & data quality |
 
 ---
 
