@@ -373,15 +373,7 @@ datathon-dicoding/
 │   ├── evaluate_prophet.md             # Laporan evaluasi performa model Prophet
 │   ├── 05_arm_workflow_dataflow.md     # Diagram dataflow & relasi file
 │   ├── azure_architecture.md           # Laporan arsitektur awan Microsoft Azure
-│   ├── 01_arm_audit_report.md          # Laporan kepatuhan QA kurikulum
-│   ├── learning_guide.md               # Panduan teori & kearifan lokal Meugang
-│   ├── fabric_recommendation.md        # Laporan kajian migrasi ke Microsoft Fabric
-│   └── strategy/                       # Laporan strategi taktis tim
-│       ├── 02_arm_roasting_report.md   # Justifikasi arsitektur & defense ML
-│       ├── 03_arm_battle_plan.md       # Target eksekusi timeline tim
-│       ├── 04_azure_implementation_guide.md # Pemasangan fungsi serverless
-│       ├── 06_arm_final_implementation_plan.md # Evaluasi akhir submission
-│       └── 07_arm_architecture_blueprint.md # Arsitektur serverless Azure
+│   └── 01_arm_audit_report.md          # Laporan kepatuhan QA kurikulum
 ├── requirements.txt                    # Dependensi Python lokal
 ├── Makefile                            # Automator CLI pintas lokal
 ├── .env                                # Konfigurasi rahasia lokal (ignore git)
@@ -419,8 +411,6 @@ datathon-dicoding/
 | [docs/05_arm_workflow_dataflow.md](docs/05_arm_workflow_dataflow.md) | **Dataflow & Workflow** — Diagram alur data harian, arsitektur MLOps, dan otomasi bot Telegram |
 | [docs/azure_architecture.md](docs/azure_architecture.md) | **Arsitektur Cloud Azure** — Laporan integrasi Azure Services, security MSI, CORS, dan biaya $0/bulan |
 | [docs/01_arm_audit_report.md](docs/01_arm_audit_report.md) | **Laporan Audit Repositori** — Hasil audit QA repositori berdasarkan kurikulum AI Impact Challenge |
-| [docs/fabric_recommendation.md](docs/fabric_recommendation.md) | **Rekomendasi Microsoft Fabric** — Kajian migrasi arsitektur data masa depan untuk skala provinsi |
-| [docs/learning_guide.md](docs/learning_guide.md) | **Learning Guide** — Panduan teori matematika Prophet dan kearifan lokal Meugang |
 | [docs/data_analysis.md](docs/data_analysis.md) | **Analisis Kualitas Data** — Profiling struktur Excel & data quality |
 
 ---

@@ -358,7 +358,6 @@ Sebagai penunjang teknis untuk juri, seluruh kode eksperimen dan dokumen analisi
 *   **`docs/azure_architecture.md`**: Dokumentasi arsitektur cloud Azure, konfigurasi Managed Identity passwordless, serta integrasi tracking MLflow. (Path Relatif: `azure_architecture.md`)
 *   **`docs/01_arm_audit_report.md`**: Audit menyeluruh terhadap repo Aceh Resilience Monitor (ARM) berdasarkan 4 modul kurikulum AI Impact Challenge oleh Ridha Ginanjar. (Path Relatif: `01_arm_audit_report.md`)
 *   **`docs/project_brief_final.md`**: Project Brief Final (Dokumen Utama ini) — Ringkasan eksekutif, fitur, teknologi, dan cara penggunaan. (Path Relatif: `project_brief_final.md`)
-*   **`docs/fabric_recommendation.md`**: Analisis kajian migrasi arsitektur data masa depan ke Microsoft Fabric untuk skalabilitas skala provinsi. (Path Relatif: `fabric_recommendation.md`)
 
 ---
 
