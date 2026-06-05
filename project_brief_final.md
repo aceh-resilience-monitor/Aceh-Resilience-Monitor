@@ -354,6 +354,7 @@ Sebagai penunjang teknis untuk juri, seluruh kode eksperimen dan dokumen analisi
 *   **`docs/eda_interpretation.md`**: Interpretasi bisnis hasil EDA, analisis lonjakan harga musiman (Meugang & Ramadan), serta temuan anomali harga pangan di Aceh.
 *   **`evaluation_prophet.md`**: Laporan evaluasi performa model Prophet harian, perbandingan metrik kesalahan (MAPE, MAE, RMSE), dan analisis error model.
 *   **`docs/azure_architecture.md`**: Dokumentasi arsitektur cloud Azure, konfigurasi Managed Identity passwordless, serta integrasi tracking MLflow.
+*   **`docs/strategy/05_arm_workflow_dataflow.md`**: Laporan visualisasi diagram alur data (*data flow*) harian, arsitektur MLOps, serta alur pemicuan otomatis bot notifikasi Telegram.
 *   **`docs/data_dictionary.md`**: Kamus data terstruktur yang mendefinisikan skema data mentah (JSON) PIHPS, data serving dashboard, dan skema logging metrik.
 *   **`docs/fabric_recommendation.md`**: Analisis kajian migrasi arsitektur data masa depan ke Microsoft Fabric untuk skalabilitas skala provinsi.
 
