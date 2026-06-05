@@ -430,16 +430,6 @@ datathon-dicoding/
 
 ---
 
-## 👥 Tim & Kontribusi
-
-| Nama | Peran | Kontribusi Utama |
-|------|-------|------------------|
-| **Aulia Muzhaffar** | ML Engineer & Analytics | Forecasting Prophet (18 model, 1 per komoditas), Early Warning System (EWS) Logic, Evaluasi Model (MAE/RMSE/MAPE), Azure Blob Storage, Bug Fixing Dashboard |
-| **Muhammad Ilhaam Ghiffary** | Data Engineer & Frontend | EDA & Notebook Analytics, Data Pipeline ETL, Z-Score Anomaly Detection, Desain & Pengembangan Dashboard UI/UX |
-| **Muhammad Arief Hidayah** | Data Acquisition & Repo Manager | Scraping Data Komoditas, Manajemen Repository GitHub |
-
----
-
 ## 📄 Lisensi
 
 Proyek ini dikembangkan untuk keperluan **Datathon Dicoding × Microsoft Elevate Training Center 2026** oleh Tim Aceh Resilience Monitor.  
