@@ -131,7 +131,7 @@ Pemodelan time-series menggunakan algoritma **Meta Prophet** dengan penambahan p
     *   `is_wet_season`: Musim hujan Sumatera (Oktober – April) dari data BMKG untuk mengantisipasi *supply shock* cabai dan bawang akibat gagal panen dan gangguan penyeberangan logistik laut.
 *   **Metode Validasi:** *Time-based Holdout Split (90 Hari)* untuk memastikan model diuji pada data yang belum pernah dilihat.
 *   **Metode Penanganan Korelasi Semu (Spurious Correlation):** Untuk menghindari korelasi semu akibat inflasi jangka panjang pada rentang waktu 2021–2026, analisis korelasi dihitung berbasis *Daily Returns* (persentase perubahan harian), bukan harga nominal mentah.
-*   **Hasil Evaluasi Akurasi (MAPE) Agregat (21 Komoditas):** **7.74%** (Mengurangi error baseline hingga 22%).
+*   **Hasil Evaluasi Akurasi (MAPE) Agregat (21 Komoditas):** **12.38%** (Tingkat akurasi stabil ~12% dengan kemampuan antisipatif terhadap turning points tanpa efek lagging).
 
 ---
 
