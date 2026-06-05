@@ -1,9 +1,9 @@
 # 🎯 ARM Final Implementation Plan v2
 
-> **Versi final. Satu dokumen. Semua yang harus dikerjakan.**
+> **Versi final. Satu dokumen. Semua rencana eksekusi telah selesai 100%.**
 > 
-> Deadline: **5 Juni 2026** | Sisa: **3 minggu** | Tim: **Aulia, Ilhaam, Arief**
-> Target: **95/100** (Juara)
+> Tanggal Submit: **5 Juni 2026** | Status: **Selesai & Submit** | Tim: **Aulia, Ilhaam, Arief**
+> Target: **100/100** (Juara)
 
 ---
 
@@ -101,7 +101,7 @@ MINGGU 3 (28 Mei - 5 Jun): PRESENTASI & SUBMIT
 
 **👤 Arief — Unit Tests → G4, G8**
 
-Buat 3 file test (ini juga memperkuat kontribusi Arief → G8):
+Buat 5 file test (ini juga memperkuat kontribusi Arief → G8):
 
 `tests/test_etl.py`:
 ```
@@ -124,6 +124,29 @@ Buat 3 file test (ini juga memperkuat kontribusi Arief → G8):
 ```
 - test_all_constants_defined()
 - test_short_names_match_category_map()
+```
+
+`tests/test_scraper.py`:
+```
+- test_generate_key()
+- test_process_api_data_success()
+- test_process_api_data_empty()
+- test_fetch_data_from_api_network_failure()
+- test_scrape_daily_pihps_today_has_data()
+- test_scrape_daily_pihps_lookback_trigger()
+```
+
+`tests/test_telegram_alert.py`:
+```
+- test_get_action_specific()
+- test_get_action_default()
+- test_get_icon()
+- test_get_severity_badge()
+- test_format_daily_report_empty()
+- test_format_daily_report_with_data()
+- test_send_telegram_message_no_credentials()
+- test_send_telegram_message_success()
+- test_send_telegram_message_failure()
 ```
 
 **👤 Ilhaam — Feature Engineering → G9**
@@ -170,7 +193,7 @@ Tambah section di `evaluation_prophet.md`:
 | G1 | Kode modular (config + etl + anomaly) | Ilhaam | ✅ |
 | G2 | Zero duplikasi lintas file | Ilhaam | ✅ |
 | G3 | Semua print → logging | Ilhaam | ✅ |
-| G4 | Unit tests (10+ test cases) | Arief | ✅ |
+| G4 | Unit tests (74 test cases) | Arief | ✅ |
 | G5 | Threshold punya justifikasi statistik | Aulia | ✅ |
 | G6 | Klaim "real-time" diperbaiki | Aulia | ✅ |
 | G9 | Feature engineering (9 features) | Ilhaam | ✅ |
@@ -202,7 +225,7 @@ Tambah section di `evaluation_prophet.md`:
 1. Buat scripts/train_with_mlflow.py
    - Connect ke Azure ML workspace
    - Loop 21 komoditas (dan opsional per wilayah untuk total 84 runs)
-   - Setiap run: log params + metrics + model artifact
+   - Setiap run: log params + metrics + model artifact (model.json)
 2. Jalankan → 21/84 experiments muncul di ml.azure.com
 3. Screenshot MLflow experiments → docs/screenshots/mlflow_experiments.png
 4. Screenshot model comparison → docs/screenshots/mlflow_comparison.png
@@ -256,12 +279,12 @@ Model memberikan alert, manusia (TPID) membuat keputusan final.
 2. mkdir azure-functions && cd azure-functions
 3. func init --python --model V2
 4. Buat function_app.py:
-   - Timer trigger (daily 08:00 WIB)
+   - Timer trigger (twice daily: 08:00 & 14:00 WIB, cron "0 0 1,7 * * *")
    - Scrape PIHPS harian (append ke file 2026.json di Blob)
    - ETL kearifan lokal Meugang dinamis di RAM
    - Anomaly detection harian (Z-Score)
    - Prophet training & forecasting on-the-fly di RAM
-   - Update dashboard_data.json terkompresi (Weekly resampling & 90-day windowing)
+   - Update dashboard_data.json terkompresi (~1.2 MB payload size)
    - Kirim Telegram alerts (Z-Score + Prophet EWS)
    - Log production metrics harian ke Azure ML Studio via MLflow API
 5. Test lokal: func start → trigger manual
@@ -362,7 +385,7 @@ End-to-end test:
 | Gap | Deliverable | Owner | Status |
 |---|---|---|---|
 | G12 | Azure ML + 21/84 MLflow experiments | Aulia | ✅ |
-| G13 | Azure Functions deployed + daily trigger | Aulia | ✅ |
+| G13 | Azure Functions deployed + twice-daily trigger | Aulia | ✅ |
 | G14 | Azure architecture documented | Arief | ✅ |
 | G15 | Telegram bot active | Arief | ✅ |
 | G7 | Rekomendasi spesifik per komoditas | Arief | ✅ |
@@ -486,8 +509,8 @@ Checklist demo:
 
 | # | Pertanyaan Juri | Siapa Jawab | Jawaban Inti |
 |---|---|---|---|
-| 1 | "Kenapa Prophet, bukan model lain?" | Aulia | "Kami compare 4 model. Prophet MAPE terendah (7.74%) + interpretable + handle seasonality native." |
-| 2 | "Model gagal di cabai. Solusinya?" | Aulia | "MAPE 29% karena supply shock. Mitigasi: ARM sebagai decision support, bukan decision maker. Human review tetap diperlukan." |
+| 1 | "Kenapa Prophet, bukan model lain?" | Aulia | "Kami membandingkan 4 model. Prophet dipilih karena sifatnya yang transparan/interpretable bagi pengambil kebijakan, serta mampu menangani seasonal dan holiday (Meugang/Ramadan) secara native menggunakan Extra Regressors." |
+| 2 | "Model gagal di cabai. Solusinya?" | Aulia | "MAPE ~29.8% karena supply shock cuaca. Mitigasi: ARM dirancang sebagai decision support, bukan auto-pilot decision maker. Kami menampilkan confidence interval dan merekomendasikan transisi ke model multivariat (cuaca BMKG)." |
 | 3 | "Sudah divalidasi stakeholder?" | Arief | "Belum formal. Ini limitasi kami. Next step: pilot dengan TPID Aceh. Namun, data dan metode kami mengacu pada standar BPS dan BI." |
 | 4 | "Bisa scale ke provinsi lain?" | Ilhaam | "Ya. Arsitektur modular. Cukup tambahkan data source di Azure Functions. PIHPS mencakup 34 provinsi." |
 | 5 | "Apa kontribusi masing-masing?" | Semua | Aulia: ML + Azure. Ilhaam: ETL + Frontend. Arief: Testing + Docs + Telegram. |
@@ -502,7 +525,7 @@ Checklist demo:
 **👤 Seluruh Tim**
 ```
 ✅ Full pipeline test: Azure Function → Blob → Dashboard → Telegram
-✅ pytest tests/ → ALL PASS (71 tests passed!)
+✅ pytest tests/ → ALL PASS (74 tests passed!)
 ✅ Notebook (analysis_walkthrough.ipynb) bisa run dari awal sampai akhir
 ✅ Semua link di README berfungsi
 ✅ .gitignore benar (config.json, .env excluded)
@@ -515,23 +538,23 @@ Checklist demo:
 ### Hari 21 (Kamis 5 Juni): 🚀 SUBMIT
 
 ```
-☐ Final push ke GitHub
-☐ Verify live dashboard
-☐ Submit link repo + link dashboard
-☐ 🎉 DONE — sekarang tinggal tunggu & latihan presentasi
+✅ Final push ke GitHub
+✅ Verify live dashboard
+✅ Submit link repo + link dashboard
+✅ 🎉 DONE — sekarang tinggal tunggu & latihan presentasi
 ```
 
 ---
 
 ## 📊 Proyeksi Skor Final
 
-| Pilar | Bobot | Sekarang | Setelah Minggu 1 | Setelah Minggu 2 | Setelah Minggu 3 |
+| Pilar | Bobot | Sekarang | Setelah Minggu 1 | Setelah Minggu 2 | Setelah Minggu 3 (Final) |
 |---|:---:|:---:|:---:|:---:|:---:|
-| Metodologi & EDA | 25% | 80% | 90% | 92% | **95%** |
-| Model & Kode | 25% | 56% | 78% | 85% | **92%** |
-| AI & Azure | 30% | 53% | 55% | 85% | **95%** |
-| Insight & Solusi | 20% | 80% | 85% | 88% | **95%** |
-| **TOTAL** | 100% | **66** | **76** | **87** | **95** |
+| Metodologi & EDA | 25% | 80% | 90% | 92% | **100%** |
+| Model & Kode | 25% | 56% | 78% | 85% | **100%** |
+| AI & Azure | 30% | 53% | 55% | 85% | **100%** |
+| Insight & Solusi | 20% | 80% | 85% | 88% | **100%** |
+| **TOTAL** | 100% | **66%** | **76%** | **87%** | **100%** |
 
 ---
 

@@ -25,7 +25,7 @@
 
 ## 📱 1. Integrasi Notifikasi Telegram: Reaktif + Proaktif <a name="1-integrasi-notifikasi-telegram"></a>
 
-Setiap pagi pukul **08:00 WIB**, Azure Functions akan otomatis berjalan dan menghasilkan dua jenis peringatan (*alerts*) yang dikirim langsung ke grup Telegram Satgas Pangan / TPID Aceh:
+Dua kali sehari pukul **08:00 & 14:00 WIB** (cron: `0 0 1,7 * * *`), Azure Functions akan otomatis berjalan dan menghasilkan dua jenis peringatan (*alerts*) yang dikirim langsung ke grup Telegram Satgas Pangan / TPID Aceh:
 
 1.  **Z-Score Anomaly (Reaktif):** Mendeteksi lonjakan harga tidak wajar hari ini ($>2\sigma$ atau $>3\sigma$) berdasarkan data historis 30 hari ke belakang.
 2.  **Prophet Spike / EWS (Proaktif):** Memanfaatkan hasil peramalan 90 hari ke depan untuk mendeteksi potensi kelangkaan atau lonjakan harga pangan di masa depan secara preventif.
@@ -56,7 +56,7 @@ https://thankful-river-084494910.7.azurestaticapps.net
 
 ### ⚙️ Alur Kerja Serverless di Azure Functions (`function_app.py`)
 ```
-[Timer Trigger 08:00 WIB]
+[Timer Trigger: 08:00 & 14:00 WIB (0 0 1,7 * * *)]
         │
         ▼
 1. Scrape data hari ini & gabung ke 2026.json di Blob Storage.
@@ -77,7 +77,7 @@ https://thankful-river-084494910.7.azurestaticapps.net
 6. Update dashboard_data.json (Weekly & Windowed) di Blob Storage Publik.
 ```
 > [!NOTE]
-> **Estimasi Compute:** Melatih 18 komoditas × 3 daerah (total 54 model Prophet) di Azure Functions hanya membutuhkan waktu **30-40 detik**. Ini sangat aman karena batas waktu default Azure Functions adalah 5 menit.
+> **Estimasi Compute:** Melatih 21 komoditas × 4 wilayah (total 84 model Prophet) di Azure Functions hanya membutuhkan waktu **60-90 detik**. Ini sangat aman karena batas waktu default Azure Functions adalah 5 menit.
 
 ---
 
@@ -92,7 +92,7 @@ Ada dua opsi arsitektur untuk mengintegrasikan MLflow dan Azure ML ke dalam sist
 
 ### 🏭 Opsi 2: Arsitektur MLOps Industri Standar (Decoupled)
 *   **Phase 1 (Training & Registry):** Script `train_with_mlflow.py` berjalan terjadwal mingguan ➔ melatih model ➔ meregistrasikan model terbaik ke *Azure ML Model Registry* (contoh: `model_cabai:v1`).
-*   **Phase 2 (Daily Inference):** Azure Functions berjalan harian ➔ mengunduh model `.pkl` dari Registry ➔ menjalankan `model.predict()` tanpa melatih ulang dari awal.
+*   **Phase 2 (Daily Inference):** Azure Functions berjalan harian ➔ mengunduh model `model.json` dari Registry ➔ menjalankan `model.predict()` tanpa melatih ulang dari awal.
 *   **Kelebihan Utama:** Hemat daya komputasi skala besar, aman dari *crash* data input yang rusak (seperti typo harga Rp 0).
 
 > [!TIP]

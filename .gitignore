@@ -70,6 +70,7 @@ git_guide.md
 modul_implementation.md
 dataup/data/
 arm_audit_report.md
+scratch/
 
 # ===========================
 # MLflow & Local DBs

@@ -468,35 +468,66 @@ def add_holiday_features(df: pd.DataFrame) -> pd.DataFrame:
     df[date_col] = pd.to_datetime(df[date_col])
 
     # ── 1. is_meugang_season: Tradisi Meugang Aceh (H-2 s/d H-0) ──
+    # Inisialisasi kolom baru 'is_meugang_season' dengan nilai default 0 (bukan hari Meugang)
     df['is_meugang_season'] = 0
+    
+    # Lakukan perulangan untuk setiap tahun dan daftar tanggal Hari H Meugang (H-0)
     for year, date_list in MEUGANG_DATES.items():
         for date_str in date_list:
+            # Konversi string tanggal Hari H Meugang menjadi objek datetime
             target_date = pd.to_datetime(date_str)
+            
+            # Hitung tanggal batas awal jendela Meugang, yaitu 2 hari sebelum Hari H (H-2)
             start_range = target_date - pd.Timedelta(days=2)
+            
+            # Buat filter (mask) untuk mencari baris data yang tanggalnya berada dalam rentang H-2 s/d H-0
             mask = (df[date_col] >= start_range) & (df[date_col] <= target_date)
+            
+            # Ubah nilai kolom 'is_meugang_season' menjadi 1 untuk baris data yang lolos filter (mask)
             df.loc[mask, 'is_meugang_season'] = 1
 
     # ── 2. is_ramadan_prep: 7 hari menjelang Ramadan ──
+    # Inisialisasi kolom baru 'is_ramadan_prep' dengan nilai default 0 (bukan periode persiapan Ramadan)
     df['is_ramadan_prep'] = 0
+    
+    # Lakukan perulangan untuk setiap tahun dan tanggal mulai Ramadan (1 Ramadan)
     for year, date_str in RAMADAN_START_DATES.items():
+        # Konversi tanggal 1 Ramadan menjadi objek datetime
         ramadan_start = pd.to_datetime(date_str)
+        
+        # Hitung batas awal periode persiapan, yaitu 7 hari sebelum Ramadan (H-7)
         prep_start = ramadan_start - pd.Timedelta(days=7)
+        
+        # Buat filter (mask) untuk rentang H-7 hingga H-1 (sebelum hari H Ramadan)
+        # Catatan: Tanda '<' berarti hari pertama Ramadan itu sendiri tidak dimasukkan ke dalam filter ini
         mask = (df[date_col] >= prep_start) & (df[date_col] < ramadan_start)
+        
+        # Ubah nilai kolom 'is_ramadan_prep' menjadi 1 untuk baris data yang masuk filter (mask)
         df.loc[mask, 'is_ramadan_prep'] = 1
 
     # ── 3. is_nataru: Natal + Tahun Baru (20 Des - 2 Jan) ──
+    # Inisialisasi kolom baru 'is_nataru' dengan nilai default 0 (bukan libur Nataru)
     df['is_nataru'] = 0
-    # Get unique years in the data
+    
+    # Ambil semua tahun unik yang ada di dalam dataset
     years_in_data = df[date_col].dt.year.unique()
     for year in years_in_data:
-        # Natal period: 20 Dec of current year to 2 Jan of next year
+        # Tentukan tanggal awal libur Nataru (20 Desember tahun berjalan)
         nataru_start = pd.to_datetime(f"{year}-12-20")
+        
+        # Tentukan tanggal akhir libur Nataru (2 Januari tahun berikutnya)
         nataru_end = pd.to_datetime(f"{year + 1}-01-02")
+        
+        # Buat filter (mask) untuk mencari baris data yang tanggalnya masuk dalam rentang 20 Des s/d 2 Jan
         mask = (df[date_col] >= nataru_start) & (df[date_col] <= nataru_end)
+        
+        # Ubah nilai kolom 'is_nataru' menjadi 1 untuk baris data yang masuk filter (mask)
         df.loc[mask, 'is_nataru'] = 1
 
     # ── 4. is_wet_season: Musim hujan BMKG Sumatera (Oktober - April) ──
-    # Curah hujan tinggi → gagal panen hortikultura → supply shock
+    # Penjelasan: Curah hujan yang tinggi memicu gagal panen hortikultura (cabai/bawang) sehingga stok menipis (supply shock).
+    # Kode ini memeriksa apakah bulan dari tanggal tersebut adalah Oktober (10) s/d April (4).
+    # Tanda .astype(int) mengubah nilai True menjadi 1 dan False menjadi 0.
     df['is_wet_season'] = df[date_col].dt.month.isin(
         [10, 11, 12, 1, 2, 3, 4]
     ).astype(int)

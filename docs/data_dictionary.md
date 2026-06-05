@@ -68,39 +68,84 @@ Membantu meredam *noise* (fluktuasi harian yang terlalu liar) guna menangkap tre
     *   Bulan November, Desember, dan Januari (Natal dan Tahun Baru).
     *   Bulan pergerakan Ramadan & Idul Fitri spesifik tiap tahun (contoh 2025: Februari dan Maret).
 
+### E. Fitur Extra Regressor Prophet (Deterministic Events)
+Untuk melatih model forecasting Prophet tingkat lanjut di RAM, fungsi `add_holiday_features()` menyuntikkan 4 regressor deterministik yang nilainya dapat dihitung untuk masa depan:
+*   `is_meugang_season` (int64): Menandai tradisi Meugang di Aceh (H-2 s/d H-0 sebelum awal Ramadan, Idul Fitri, dan Idul Adha).
+*   `is_ramadan_prep` (int64): Masa persiapan 7 hari sebelum awal Ramadan.
+*   `is_nataru` (int64): Periode Natal & Tahun Baru (20 Desember s/d 2 Januari).
+*   `is_wet_season` (int64): Musim hujan BMKG Sumatera (Oktober s/d April).
+
 ---
 
 ## 📊 4. Payload Output Dasbor (`dashboard_data.json`)
-Pipeline orchestrator `prepare_dashboard_data.py` menghasilkan satu file payload terintegrasi (`dashboard_data.json`) berukuran ~2.3 MB yang dikonsumsi langsung oleh frontend Static Web App. File JSON ini memiliki 21 bagian utama yang disusun sebagai berikut:
+Pipeline orchestrator `prepare_dashboard_data.py` menghasilkan satu file payload terintegrasi (`dashboard_data.json`) berukuran ~1.2 MB yang diunggah ke public Blob Storage container (`$web`) untuk dikonsumsi langsung oleh frontend Static Web App.
 
-### Bagian Kunci & Skema Objek:
-1.  **`kpi`** (object): Metrik ringkasan eksekutif provinsi.
-    *   `totalRecords`: Total titik data terproses (contoh: `210,955`).
-    *   `activeCommodities`: Jumlah komoditas aktif (`21`).
-    *   `criticalAlertsCount`: Jumlah anomali berstatus Kritis saat ini.
-    *   `warningAlertsCount`: Jumlah anomali berstatus Waspada saat ini.
-2.  **`commodityCards`** (array of objects): Data ringkasan terkini untuk grid kartu utama dasbor. Berisi harga terbaru, rata-rata MA30, nilai CV%, status anomali (`Aman`, `Waspada`, atau `Kritis`), dan trend arah harga.
-3.  **`timeseries`** (object): Data historis mingguan agregat tingkat provinsi per komoditas untuk grafik tren utama.
-4.  **`regional`** (object): Data tren harga terperinci tingkat daerah (Banda Aceh, Lhokseumawe, Meulaboh). Memungkinkan visualisasi perbandingan disparitas harga antar daerah (Tier 2 Dashboard).
-5.  **`priceBySource`** (object): Distribusi harga pangan terbaru berdasarkan 4 saluran distribusi (sumber) per komoditas. Berguna untuk memantau disparitas rantai pasok (Tier 3 Dashboard).
-6.  **`regionalForecasts`** (object): Hasil prediksi model Meta Prophet 90 hari ke depan yang dihitung **secara spesifik per daerah**.
-7.  **`forecasts`** (object): Proyeksi harga tingkat provinsi hasil rata-rata agregasi.
-8.  **`anomalies`** (array of objects): Daftar seluruh transaksi anomali harga pangan historis yang mendeteksi lonjakan di luar $2\sigma$.
+### Struktur Key Utama Payload:
+
+| Nama Key | Tipe Data | Deskripsi |
+| :--- | :---: | :--- |
+| `kpi` | object | Ringkasan indikator kinerja utama tingkat provinsi (detail di bawah). |
+| `commodityCards` | array | Data status teranyar per komoditas untuk komponen grid kartu dasbor (detail di bawah). |
+| `timeseries` | object | Histori harga mingguan tingkat provinsi per komoditas untuk grafik tren utama. |
+| `timeseriesRecentDaily` | object | Histori harga harian tingkat provinsi per komoditas selama 90 hari terakhir. |
+| `anomalies` | array | Daftar transaksi anomali harga pangan historis hasil deteksi Z-score (>2σ). |
+| `alertFeed` | array | Gabungan alert prediksi lonjakan harga (Prophet) dan anomali historis. |
+| `yoyData` | array | Perbandingan persentase harga Year-over-Year (YoY) antar tahun. |
+| `seasonality` | object | Z-score bulanan untuk analisis pola seasonal komoditas. |
+| `volatility` | object | Nilai Coefficient of Variation (CV) tahunan per komoditas. |
+| `correlation` | object | Matriks korelasi harga antar komoditas (koefisien korelasi Pearson). |
+| `categoryMonthly` | object | Tren rata-rata harga bulanan per kategori induk komoditas (misal: Beras, Cabai). |
+| `forecasts` | object | Hasil proyeksi harga agregat provinsi 90 hari ke depan hasil model Prophet. |
+| `categories` | array | Daftar unik kategori induk pangan yang terurut. |
+| `categoryIcons` | object | Pemetaan ikon emoji per kategori pangan. |
+| `categoryColors` | object | Pemetaan kode warna hex per kategori pangan untuk grafik. |
+| `aiInsight` | string | Narasi ringkasan eksekutif hasil analisis berbasis data (Executive Summary). |
+| `regional` | object | Tren harga harian serta metrik regional tingkat kabupaten/kota (Banda Aceh, Lhokseumawe, Meulaboh). |
+| `priceBySource` | object | Margin harga pangan berdasarkan saluran distribusi / sumber harga (Tradisional vs Modern vs Produsen vs Grosir). |
+| `regionalForecasts` | object | Proyeksi harga pangan 90 hari ke depan per daerah hasil model Prophet regional. |
+| `regions` | array | Daftar wilayah pemantauan: `["Banda Aceh", "Lhokseumawe", "Meulaboh"]`. |
+| `priceSources` | array | Daftar saluran distribusi: `["Pasar Tradisional", "Pasar Modern", "Pedagang Besar", "Produsen"]`. |
+
+### A. Detail Objek `kpi`:
+*   `totalCommodities` (integer): Jumlah komoditas pangan aktif (21).
+*   `criticalAlerts` (integer): Jumlah komoditas dengan status anomali 'critical' (Z-score > 3σ atau perubahan tahunan > 20%).
+*   `warningAlerts` (integer): Jumlah komoditas dengan status anomali 'warning' (Z-score > 2σ atau perubahan tahunan > 10%).
+*   `avgPriceChange` (float): Rata-rata perubahan harga total (%) seluruh komoditas.
+*   `dataStartDate` (string): Tanggal awal data historis (`YYYY-MM-DD`).
+*   `dataEndDate` (string): Tanggal akhir data terproses (`YYYY-MM-DD`).
+*   `totalDataPoints` (integer): Total baris titik data mentah yang digunakan.
+*   `recentAnomalies` (integer): Jumlah anomali harga dalam 90 hari terakhir.
+*   `totalRegions` (integer): Jumlah daerah pemantauan (3).
+*   `totalSources` (integer): Jumlah saluran distribusi harga (4).
+
+### B. Detail Objek di `commodityCards`:
+Setiap elemen dalam array `commodityCards` memiliki struktur sebagai berikut:
+*   `commodity` (string): Nama lengkap komoditas (misal: `"Beras Kualitas Bawah I"`).
+*   `shortName` (string): Singkatan nama untuk visualisasi (misal: `"Beras Bawah I"`).
+*   `category` (string): Kategori induk komoditas (misal: `"Beras"`).
+*   `icon` (string): Emoji representatif.
+*   `latestPrice` (float): Harga terbaru absolut (Rp).
+*   `monthChange` (float): Persentase perubahan harga bulan ini dibanding rata-rata 30 hari sebelumnya.
+*   `totalChange` (float): Persentase perubahan harga kumulatif multi-tahun.
+*   `cvLatest` (float): Koefisien variasi harga tahun berjalan (%).
+*   `cv2025` (float): Koefisien variasi harga khusus tahun 2025 (untuk kompatibilitas frontend).
+*   `status` (string): Klasifikasi status anomali (`normal`, `warning`, `critical`).
+*   `recentAnomalies` (integer): Jumlah anomali yang dialami komoditas tersebut dalam 90 hari terakhir.
 
 ---
 
 ## 📝 5. Tabel Referensi & Standar Klasifikasi
 
-### A. Klasifikasi 21 Sub-Komoditas Terdaftar (`CATEGORY_MAP`)
+### A. Klasifikasi 21 Sub-Komoditas Terdaftar (`CATEGORY_MAP` & `SHORT_NAMES`)
 
-| No | Nama Sub-Komoditas | Kategori Induk | Singkatan Dasbor |
+| No | Nama Sub-Komoditas (Database/JSON) | Kategori Induk | Singkatan Dasbor (`shortName`) |
 |---|---|---|---|
-| 1 | Beras Kualitas Bawah I | Beras | Beras Bawah 1 |
-| 2 | Beras Kualitas Bawah II | Beras | Beras Bawah 2 |
-| 3 | Beras Kualitas Medium I | Beras | Beras Medium 1 |
-| 4 | Beras Kualitas Medium II | Beras | Beras Medium 2 |
-| 5 | Beras Kualitas Super I | Beras | Beras Super 1 |
-| 6 | Beras Kualitas Super II | Beras | Beras Super 2 |
+| 1 | Beras Kualitas Bawah I | Beras | Beras Bawah I |
+| 2 | Beras Kualitas Bawah II | Beras | Beras Bawah II |
+| 3 | Beras Kualitas Medium I | Beras | Beras Medium I |
+| 4 | Beras Kualitas Medium II | Beras | Beras Medium II |
+| 5 | Beras Kualitas Super I | Beras | Beras Super I |
+| 6 | Beras Kualitas Super II | Beras | Beras Super II |
 | 7 | Bawang Merah Ukuran Sedang | Bawang Merah | Bawang Merah |
 | 8 | Bawang Putih Ukuran Sedang | Bawang Putih | Bawang Putih |
 | 9 | Cabai Merah Keriting | Cabai Merah | Cabai Keriting |
@@ -110,9 +155,9 @@ Pipeline orchestrator `prepare_dashboard_data.py` menghasilkan satu file payload
 | 13 | Telur Ayam Ras Segar | Telur Ayam | Telur Ayam |
 | 14 | Gula Pasir Lokal | Gula Pasir | Gula Lokal |
 | 15 | Gula Pasir Kualitas Premium | Gula Pasir | Gula Premium |
-| 16 | Minyak Goreng Curah | Minyak Goreng | Minyak Curah |
-| 17 | Minyak Goreng Kemasan Bermerk 1 | Minyak Goreng | Minyak Merk 1 |
-| 18 | Minyak Goreng Kemasan Bermerk 2 | Minyak Goreng | Minyak Merk 2 |
+| 16 | Minyak Goreng Curah | Minyak Goreng | M. Goreng Curah |
+| 17 | Minyak Goreng Kemasan Bermerk 1 | Minyak Goreng | M. Goreng Merk 1 |
+| 18 | Minyak Goreng Kemasan Bermerk 2 | Minyak Goreng | M. Goreng Merk 2 |
 | 19 | Cabai Merah Besar *(NEW)* | Cabai Merah | Cabai Besar |
 | 20 | Cabai Rawit Merah *(NEW)* | Cabai Rawit | Cabai Rawit Merah |
 | 21 | Daging Sapi Kualitas 2 *(NEW)* | Daging Sapi | Daging Sapi 2 |

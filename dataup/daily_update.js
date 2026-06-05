@@ -38,23 +38,7 @@ const processDate = async (dateStr, existingDataMap) => {
         }
     }
     
-    if (hasData && dailyData.length > 0) {
-        const newEntries = [];
-        
-        for (const item of dailyData) {
-            const key = generateKey(item);
-            if (!existingDataMap.has(key)) {
-                // If the item doesn't exist yet, we add it
-                existingDataMap.set(key, true);
-                newEntries.push(item);
-            }
-        }
-        
-        return newEntries;
-    } else {
-        logMessage(`[SKIP] No data found from API for ${dateStr}`);
-        return [];
-    }
+    return (hasData && dailyData.length > 0) ? dailyData : [];
 };
 
 const runDailyUpdate = async () => {
@@ -67,46 +51,40 @@ const runDailyUpdate = async () => {
     const filePath = getFilePathForYear(year);
     const existingData = readJsonFile(filePath);
     
-    // Create a map for fast deduplication checking
-    const existingDataMap = new Map();
-    for (const item of existingData) {
-        existingDataMap.set(generateKey(item), true);
-    }
-    
-    logMessage(`[INFO] Loaded ${existingData.length} existing records for year ${year}`);
+    // Tentukan 3 tanggal terakhir untuk dicek secara konstan
+    const datesToCheck = [
+        today.format('YYYY-MM-DD'),
+        today.subtract(1, 'day').format('YYYY-MM-DD'),
+        today.subtract(2, 'day').format('YYYY-MM-DD')
+    ];
     
     let totalNewEntries = [];
-
-    // 1. Fetch today's data
-    const todayNewEntries = await processDate(todayStr, existingDataMap);
+    const datesSuccessfullyScraped = new Set();
     
-    // 2. If today is empty, check 7 days back
-    if (todayNewEntries.length === 0) {
-        logMessage(`[INFO] No new data for today (${todayStr}). Checking 7 days back...`);
-        
-        for (let i = 1; i <= 7; i++) {
-            const pastDateStr = today.subtract(i, 'day').format('YYYY-MM-DD');
-            const pastEntries = await processDate(pastDateStr, existingDataMap);
-            
-            if (pastEntries.length > 0) {
-                totalNewEntries = totalNewEntries.concat(pastEntries);
-            }
+    for (const dateStr of datesToCheck) {
+        const dailyEntries = await processDate(dateStr, null);
+        if (dailyEntries.length > 0) {
+            logMessage(`[SUCCESS] Fetched ${dailyEntries.length} records for date ${dateStr}`);
+            totalNewEntries = totalNewEntries.concat(dailyEntries);
+            datesSuccessfullyScraped.add(dateStr);
         }
-    } else {
-        totalNewEntries = totalNewEntries.concat(todayNewEntries);
     }
     
-    // 3. Save if there are new entries
     if (totalNewEntries.length > 0) {
-        const updatedData = existingData.concat(totalNewEntries);
+        // OVERWRITE LOGIC: Saring data lama, buang record yang tanggalnya berhasil di-scrape ulang
+        const cleanedExistingData = existingData.filter(
+            item => !datesSuccessfullyScraped.has(item.tanggal)
+        );
         
-        // Sort data by date
+        const updatedData = cleanedExistingData.concat(totalNewEntries);
+        
+        // Urutkan data secara kronologis
         updatedData.sort((a, b) => dayjs(a.tanggal).valueOf() - dayjs(b.tanggal).valueOf());
         
         writeJsonFile(filePath, updatedData);
-        logMessage(`[SUCCESS] Added ${totalNewEntries.length} new records. Total records now: ${updatedData.length}`);
+        logMessage(`[SUCCESS] Replaced and added data. Total records now: ${updatedData.length}`);
     } else {
-        logMessage(`[INFO] No new records to add. System is up to date.`);
+        logMessage(`[INFO] No new data found in 3-day lookback window.`);
     }
     
     logMessage('[INFO] Daily update completed successfully!');
