@@ -325,6 +325,11 @@ make serve
 ```
 datathon-dicoding/
 ├── data/                               # Dataset mentah PIHPS (Excel)
+├── dataup/                             # Engine Web Scraper PIHPS (Node.js)
+│   ├── daily_update.js                 # Skrip otomatisasi penarikan data harian
+│   ├── helper.js                       # Modul parser & selector HTML scraping
+│   ├── package.json                    # Dependensi package scraper
+│   └── data/                           # Folder penyimpanan berkas JSON hasil scraping
 ├── azure-functions/                    # Pipeline ETL & ML Serverless (Azure Functions Python)
 │   ├── function_app.py                 # Endpoint pemicu pipeline harian
 │   ├── requirements.txt                # Dependensi serverless
